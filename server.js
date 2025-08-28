@@ -43,6 +43,22 @@ io.use((socket, next) => {
 let activeRooms = [];
 let gameStates = {};
 
+// Mapa de timers de desconexión con período de gracia por jugador
+const disconnectTimers = new Map(); // key: `${roomId}:${playerName}` -> timeout id
+const GRACE_PERIOD_MS = 15000;
+
+// Helpers de conteo de conectados y actualización de sala
+function getConnectedPlayers(gameState) {
+  return (gameState.players || []).filter(p => p.connected !== false);
+}
+function updateActiveRoomsCount(roomId) {
+  const gameState = gameStates[roomId];
+  const roomIndex = activeRooms.findIndex(r => r.roomId === roomId);
+  if (gameState && roomIndex !== -1) {
+    activeRooms[roomIndex].currentPlayers = getConnectedPlayers(gameState).length;
+  }
+}
+
 // Rate limiting simple por socket
 const rateLimits = new Map(); // key: socket.id -> { eventKey: [timestamps] }
 
@@ -156,10 +172,10 @@ io.on('connection', (socket) => {
       return socket.emit('error', { message: 'La sala no existe' });
     }
     
-    // Enviar estado completo de la sala
+    // Enviar estado completo de la sala (solo jugadores conectados)
     socket.emit('roomState', {
       roomId: gameState.roomId,
-      players: gameState.players,
+      players: getConnectedPlayers(gameState),
       isPlaying: gameState.isPlaying,
       currentRound: gameState.currentRound,
       currentLetter: gameState.currentLetter,
@@ -189,9 +205,21 @@ io.on('connection', (socket) => {
     socket.roomId = roomId;
     socket.playerName = name;
     gameState.players[playerIndex].id = socket.id;
+    gameState.players[playerIndex].connected = true;
+    delete gameState.players[playerIndex].disconnectedAt;
+
+    // Cancelar timer de desconexión si existía
+    const key = `${roomId}:${name}`;
+    if (disconnectTimers.has(key)) {
+      clearTimeout(disconnectTimers.get(key));
+      disconnectTimers.delete(key);
+    }
+
+    updateActiveRoomsCount(roomId);
+
     socket.emit('roomState', {
       roomId: gameState.roomId,
-      players: gameState.players,
+      players: getConnectedPlayers(gameState),
       isPlaying: gameState.isPlaying,
       currentRound: gameState.currentRound,
       currentLetter: gameState.currentLetter,
@@ -236,7 +264,8 @@ io.on('connection', (socket) => {
       name: playerName,
       isCreator: true,
       score: 0,
-      ready: false
+      ready: false,
+      connected: true
     });
     
     // Inicializar puntuaciones
@@ -257,7 +286,7 @@ io.on('connection', (socket) => {
     // Notificar al creador
     socket.emit('joinedRoom', {
       roomId,
-      players: gameStates[roomId].players,
+      players: getConnectedPlayers(gameStates[roomId]),
       categories: gameStates[roomId].categories,
       isCreator: true
     });
@@ -307,7 +336,8 @@ io.on('connection', (socket) => {
       name: playerName,
       isCreator: false,
       score: 0,
-      ready: false
+      ready: false,
+      connected: true
     });
     
     // Inicializar puntuaciones
@@ -320,10 +350,7 @@ io.on('connection', (socket) => {
     socket.playerName = playerName;
     
     // Actualizar información de la sala en activeRooms
-    const roomIndex = activeRooms.findIndex(room => room.roomId === roomId);
-    if (roomIndex !== -1) {
-      activeRooms[roomIndex].currentPlayers = gameState.players.length;
-    }
+    updateActiveRoomsCount(roomId);
     
     // Notificar a todos los jugadores en la sala sobre el nuevo jugador
     io.to(roomId).emit('playerJoined', {
@@ -333,14 +360,14 @@ io.on('connection', (socket) => {
         isCreator: false,
         score: 0
       },
-      players: gameState.players,
+      players: getConnectedPlayers(gameState),
       roomId: roomId
     });
     
     // Notificar al jugador que se unió
     socket.emit('joinedRoom', {
       roomId,
-      players: gameState.players,
+      players: getConnectedPlayers(gameState),
       categories: gameState.categories,
       isCreator: false
     });
@@ -557,64 +584,92 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     const playerName = socket.playerName;
-    
-    if (roomId && gameStates[roomId]) {
-      // Eliminar jugador de la sala
-      const playerIndex = gameStates[roomId].players.findIndex(p => p.id === socket.id);
-      
-      if (playerIndex !== -1) {
-        const isCreator = gameStates[roomId].players[playerIndex].isCreator;
-        // Si el juego está en curso, marcar como desconectado en vez de eliminar para permitir reconexión
-        if (gameStates[roomId].isPlaying) {
-          gameStates[roomId].players[playerIndex].connected = false;
-          gameStates[roomId].players[playerIndex].id = null;
-          gameStates[roomId].players[playerIndex].disconnectedAt = Date.now();
-        } else {
-          gameStates[roomId].players.splice(playerIndex, 1);
-        }
-        
-        // Actualizar información de la sala
-        const roomIndex = activeRooms.findIndex(room => room.roomId === roomId);
-        if (roomIndex !== -1) {
-          activeRooms[roomIndex].currentPlayers = gameStates[roomId].players.length;
-        }
-        
-        // Solo eliminar la sala si no quedan jugadores Y no está en juego
-        if (gameStates[roomId].players.length === 0 && !gameStates[roomId].isPlaying) {
-          // Mantener la sala por 5 minutos para reconexiones
-          setTimeout(() => {
-            if (gameStates[roomId] && gameStates[roomId].players.length === 0) {
-              delete gameStates[roomId];
-              const roomIndex = activeRooms.findIndex(room => room.roomId === roomId);
-              if (roomIndex !== -1) {
-                activeRooms.splice(roomIndex, 1);
-              }
-              console.log(`Sala ${roomId} eliminada después de 5 minutos sin jugadores`);
-            }
-          }, 5 * 60 * 1000); // 5 minutos
-        } 
-        // Si el creador se desconecta, asignar nuevo creador
-        else if (isCreator && gameStates[roomId].players.length > 0) {
-          gameStates[roomId].players[0].isCreator = true;
-          gameStates[roomId].creator = gameStates[roomId].players[0].name;
-          
-          // Notificar nuevo creador
-          io.to(gameStates[roomId].players[0].id).emit('youAreCreator');
-        }
-        
-        // Notificar a los demás jugadores
-        if (gameStates[roomId]) {
-          io.to(roomId).emit('playerLeft', {
-            playerName,
-            players: gameStates[roomId].players || []
-          });
-        }
-        
-        console.log(`${playerName} se desconectó de la sala ${roomId}`);
-      }
+
+    if (!roomId || !gameStates[roomId]) {
+      logEvent({ socket, event: 'disconnect', level: 'info', message: 'Cliente desconectado (sin sala)' });
+      return;
     }
-    
-    logEvent({ socket, event: 'disconnect', level: 'info', message: 'Cliente desconectado' });
+
+    const gameState = gameStates[roomId];
+    const playerIndex = gameState.players.findIndex(p => p.id === socket.id || p.name === playerName);
+
+    if (playerIndex === -1) {
+      logEvent({ socket, event: 'disconnect', level: 'info', message: 'Cliente desconectado (jugador no encontrado)' });
+      return;
+    }
+
+    const player = gameState.players[playerIndex];
+    const wasCreator = !!player.isCreator;
+
+    // Marcar como desconectado y preparar período de gracia
+    player.connected = false;
+    player.id = null;
+    player.disconnectedAt = Date.now();
+
+    updateActiveRoomsCount(roomId);
+
+    // Programar desconexión definitiva tras período de gracia
+    const key = `${roomId}:${playerName}`;
+    if (disconnectTimers.has(key)) {
+      clearTimeout(disconnectTimers.get(key));
+      disconnectTimers.delete(key);
+    }
+
+    const timeoutId = setTimeout(() => {
+      const gs = gameStates[roomId];
+      if (!gs) return;
+
+      const idx = gs.players.findIndex(p => p.name === playerName);
+      if (idx === -1) return;
+
+      const wasCreatorFinal = !!gs.players[idx].isCreator;
+
+      // Si el juego no está en curso, eliminamos definitivamente al jugador
+      if (!gs.isPlaying) {
+        gs.players.splice(idx, 1);
+      }
+
+      // Reasignar creador si aplica
+      if (wasCreatorFinal) {
+        const next = getConnectedPlayers(gs)[0];
+        if (next) {
+          next.isCreator = true;
+          gs.creator = next.name;
+          if (next.id) io.to(gs.players.find(p => p.name === next.name)?.id || next.id).emit('youAreCreator');
+        }
+      }
+
+      updateActiveRoomsCount(roomId);
+
+      // Notificar a los demás jugadores de forma definitiva
+      if (gameStates[roomId]) {
+        io.to(roomId).emit('playerLeft', {
+          playerName,
+          players: getConnectedPlayers(gs)
+        });
+      }
+
+      // Eliminar sala si está vacía (sin conectados) y no está en juego
+      if (!gs.isPlaying && getConnectedPlayers(gs).length === 0) {
+        setTimeout(() => {
+          const ref = gameStates[roomId];
+          if (ref && getConnectedPlayers(ref).length === 0) {
+            delete gameStates[roomId];
+            const roomIndex = activeRooms.findIndex(room => room.roomId === roomId);
+            if (roomIndex !== -1) {
+              activeRooms.splice(roomIndex, 1);
+            }
+            console.log(`Sala ${roomId} eliminada después de 5 minutos sin jugadores`);
+          }
+        }, 5 * 60 * 1000);
+      }
+
+      disconnectTimers.delete(key);
+    }, GRACE_PERIOD_MS);
+
+    disconnectTimers.set(key, timeoutId);
+
+    logEvent({ socket, event: 'disconnect', level: 'info', message: 'Cliente desconectado (período de gracia iniciado)' });
   });
 });
 

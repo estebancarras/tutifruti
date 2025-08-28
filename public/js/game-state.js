@@ -66,6 +66,7 @@ class GameState {
    */
   setCurrentLetter(letter) {
     this.currentLetter = letter;
+    console.log('[GameState] setCurrentLetter ->', letter);
     this.enableInputs();
   }
 
@@ -198,15 +199,29 @@ class GameState {
    */
   enableInputs() {
     const inputs = document.querySelectorAll('.word-input');
+    let enabledCount = 0;
     inputs.forEach(input => {
+      // Asegurar que se elimine el atributo disabled completamente
       input.disabled = false;
+      input.removeAttribute('disabled');
+      input.readOnly = false;
+
       const category = input.getAttribute('data-category');
       input.placeholder = `Palabra con "${this.currentLetter}"...`;
+      if (!input.disabled) enabledCount++;
     });
 
     const submitButton = document.getElementById('submitWordButton');
     if (submitButton) {
       submitButton.disabled = false;
+    }
+
+    console.log('[GameState] enableInputs -> habilitados:', enabledCount);
+
+    // Si no hay foco actual, enfocar el primer input disponible por accesibilidad
+    const firstInput = document.querySelector('#input-NOMBRE');
+    if (firstInput && !firstInput.disabled && document.activeElement?.tagName !== 'INPUT') {
+      try { firstInput.focus(); } catch (_) {}
     }
   }
 
@@ -217,6 +232,8 @@ class GameState {
     const inputs = document.querySelectorAll('.word-input');
     inputs.forEach(input => {
       input.disabled = true;
+      input.setAttribute('disabled', 'true');
+      input.readOnly = true;
     });
 
     const submitButton = document.getElementById('submitWordButton');

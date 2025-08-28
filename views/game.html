@@ -518,7 +518,7 @@
     }
 
     function handleRouletteResult(data) {
-      console.log('Resultado de la ruleta:', data);
+      console.log('[Game] handleRouletteResult ->', data);
       
       gameState.setCurrentLetter(data.letter);
       
@@ -531,11 +531,21 @@
       
       // Sincronización: el temporizador se renderiza solo con TIMER_UPDATE
       
-      // Enfocar primer input
-      const firstInput = document.querySelector('#input-NOMBRE');
-      if (firstInput && !firstInput.disabled) {
-        firstInput.focus();
-      }
+      // Verificar que los inputs estén habilitados
+      setTimeout(() => {
+        const inputs = document.querySelectorAll('.word-input');
+        const enabledInputs = Array.from(inputs).filter(input => !input.disabled);
+        console.log('[Game] Inputs habilitados después de rouletteResult:', enabledInputs.length);
+        
+        // Enfocar primer input
+        const firstInput = document.querySelector('#input-NOMBRE');
+        if (firstInput && !firstInput.disabled) {
+          firstInput.focus();
+          console.log('[Game] Foco establecido en primer input');
+        } else {
+          console.warn('[Game] Primer input no disponible o deshabilitado');
+        }
+      }, 100);
     }
 
     function handleTimerUpdate(data) {
@@ -555,7 +565,7 @@
     }
 
     function handleRoundEnded(data) {
-      console.log('Ronda terminada:', data);
+      console.log('[Game] handleRoundEnded ->', data);
       
       gameState.clearTimer();
       gameState.disableInputs();
