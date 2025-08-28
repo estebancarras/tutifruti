@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Tutifrutti - El juego de palabras más divertido. Juega online con tus amigos.">
+  <meta name="keywords" content="juego, palabras, tutifrutti, online, multijugador">
+  <title>Tutifrutti - Juego de Palabras Online</title>
+  
+  <!-- Preconnect para optimizar carga de fuentes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="/public/css/base.css">
+  <link rel="stylesheet" href="/public/css/components.css">
+  
+  <!-- Socket.IO -->
+    <script src="/socket.io/socket.io.js"></script>
+  
+  <style>
+    /* Estilos específicos para la página principal */
+    .hero {
+      background: linear-gradient(135deg, var(--color-primary) 0%, #764ba2 100%);
+      color: var(--color-white);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    
+    .hero__content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+    }
+    
+    .hero__title {
+      font-family: var(--font-secondary);
+      font-size: clamp(2.5rem, 8vw, 4rem);
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--space-6);
+      text-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      line-height: 1.1;
+    }
+    
+    .hero__subtitle {
+      font-size: clamp(1.125rem, 4vw, 1.5rem);
+      margin-bottom: var(--space-8);
+      opacity: 0.9;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .hero__form {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius-2xl);
+      padding: var(--space-8);
+      box-shadow: var(--shadow-2xl);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    
+    .hero__form-title {
+      color: var(--color-gray-800);
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--space-6);
+      text-align: center;
+    }
+    
+    .hero__actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+      margin-top: var(--space-6);
+    }
+    
+    .game-info {
+      background: var(--color-white);
+      border-radius: var(--radius-2xl);
+      padding: var(--space-8);
+      margin-top: var(--space-12);
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .game-info__title {
+      color: var(--color-gray-800);
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--space-6);
+      text-align: center;
+    }
+    
+    .game-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--space-6);
+    }
+    
+    .game-step {
+      text-align: center;
+      padding: var(--space-4);
+    }
+    
+    .game-step__number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      color: var(--color-white);
+      border-radius: 50%;
+      font-weight: var(--font-weight-bold);
+      font-size: var(--text-lg);
+      margin-bottom: var(--space-4);
+    }
+    
+    .game-step__title {
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-gray-800);
+      margin-bottom: var(--space-2);
+    }
+    
+    .game-step__description {
+      color: var(--color-gray-600);
+      font-size: var(--text-sm);
+      line-height: 1.6;
+    }
+    
+    .footer {
+      background: var(--color-gray-800);
+      color: var(--color-white);
+      text-align: center;
+      padding: var(--space-6);
+      font-size: var(--text-sm);
+    }
+    
+    @media (max-width: 640px) {
+      .hero__actions {
+        grid-template-columns: 1fr;
+      }
+      
+      .hero__form {
+        padding: var(--space-6);
+        margin: var(--space-4);
+      }
+      
+      .game-info {
+        margin: var(--space-8) var(--space-4) 0;
+        padding: var(--space-6);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="main-content" class="hero">
+    <div class="container">
+      <div class="hero__content">
+        <h1 class="hero__title">
+          🍎 Tutifrutti
+        </h1>
+        <p class="hero__subtitle">
+          El juego de palabras más divertido. Crea salas, invita amigos y demuestra tu creatividad.
+        </p>
+        
+        <form class="hero__form" id="welcomeForm" novalidate>
+          <h2 class="hero__form-title">¡Empezar a jugar!</h2>
+          
+            <div class="form-group">
+            <label for="username" class="form-label form-label--required">
+              Tu nombre
+            </label>
+            <input 
+              type="text" 
+              id="username" 
+              name="username"
+              class="form-input" 
+              placeholder="Ingresa tu nombre"
+              required
+              autocomplete="username"
+              maxlength="20"
+              aria-describedby="username-help"
+            >
+            <span id="username-help" class="form-help">
+              Máximo 20 caracteres. Será visible para otros jugadores.
+            </span>
+            <span class="form-error" id="username-error" role="alert"></span>
+          </div>
+          
+          <div class="hero__actions">
+            <button type="button" id="createRoomButton" class="btn btn--primary">
+              <span>🎮</span>
+              Crear Sala
+            </button>
+            <button type="button" id="joinRoomButton" class="btn btn--secondary">
+              <span>🚪</span>
+              Unirse a Sala
+            </button>
+          </div>
+        </form>
+        
+        <section class="game-info">
+          <h2 class="game-info__title">¿Cómo jugar?</h2>
+          <div class="game-steps">
+            <div class="game-step">
+              <div class="game-step__number" aria-hidden="true">1</div>
+              <h3 class="game-step__title">Crear o unirse</h3>
+              <p class="game-step__description">
+                Crea una nueva sala o únete a una existente con el código de sala.
+              </p>
+            </div>
+            <div class="game-step">
+              <div class="game-step__number" aria-hidden="true">2</div>
+              <h3 class="game-step__title">Esperar jugadores</h3>
+              <p class="game-step__description">
+                Espera a que el anfitrión inicie el juego cuando haya suficientes jugadores.
+              </p>
+            </div>
+            <div class="game-step">
+              <div class="game-step__number" aria-hidden="true">3</div>
+              <h3 class="game-step__title">Girar la ruleta</h3>
+              <p class="game-step__description">
+                La ruleta seleccionará una letra aleatoria para la ronda.
+              </p>
+            </div>
+            <div class="game-step">
+              <div class="game-step__number" aria-hidden="true">4</div>
+              <h3 class="game-step__title">Completar categorías</h3>
+              <p class="game-step__description">
+                Escribe palabras que empiecen con esa letra para cada categoría antes de que se acabe el tiempo.
+              </p>
+            </div>
+            <div class="game-step">
+              <div class="game-step__number" aria-hidden="true">5</div>
+              <h3 class="game-step__title">Obtener puntos</h3>
+              <p class="game-step__description">
+                Gana puntos por palabras únicas y palabras con más de 3 sílabas. ¡El jugador con más puntos gana!
+              </p>
+            </div>
+        </div>
+        </section>
+        </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>&copy; 2024 Tutifrutti Online - Versión 2.0</p>
+    </div>
+    </footer>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { storage, validateUsername, showNotification } from '/utils/helpers.js';
+    import { ROUTES } from '/utils/constants.js';
+
+    // Referencias a elementos
+    const form = document.getElementById('welcomeForm');
+    const usernameInput = document.getElementById('username');
+    const usernameError = document.getElementById('username-error');
+    const createRoomButton = document.getElementById('createRoomButton');
+    const joinRoomButton = document.getElementById('joinRoomButton');
+
+    // Cargar nombre guardado si existe
+    const savedUsername = storage.getUsername();
+    if (savedUsername) {
+      usernameInput.value = savedUsername;
+    }
+
+    // Validación en tiempo real
+    usernameInput.addEventListener('input', () => {
+      clearError();
+      validateForm();
+    });
+
+    // Event listeners para botones
+    createRoomButton.addEventListener('click', () => {
+      if (validateAndSaveUsername()) {
+        window.location.href = ROUTES.CREATE_ROOM;
+      }
+    });
+
+    joinRoomButton.addEventListener('click', () => {
+      if (validateAndSaveUsername()) {
+        window.location.href = ROUTES.JOIN_ROOM;
+      }
+    });
+
+    // Funciones de validación
+    function validateAndSaveUsername() {
+      const username = usernameInput.value.trim();
+      
+      if (!validateUsername(username)) {
+        showError('Por favor, ingresa un nombre válido');
+        usernameInput.focus();
+        return false;
+      }
+
+      if (username.length > 20) {
+        showError('El nombre no puede tener más de 20 caracteres');
+        usernameInput.focus();
+        return false;
+      }
+
+      // Guardar nombre
+      storage.setUsername(username);
+      return true;
+    }
+
+    function validateForm() {
+      const username = usernameInput.value.trim();
+      const isValid = validateUsername(username) && username.length <= 20;
+      
+      createRoomButton.disabled = !isValid;
+      joinRoomButton.disabled = !isValid;
+      
+      return isValid;
+    }
+
+    function showError(message) {
+      usernameError.textContent = message;
+      usernameInput.classList.add('form-input--error');
+      usernameInput.setAttribute('aria-invalid', 'true');
+    }
+
+    function clearError() {
+      usernameError.textContent = '';
+      usernameInput.classList.remove('form-input--error');
+      usernameInput.removeAttribute('aria-invalid');
+    }
+
+    // Validación inicial
+    validateForm();
+
+    // Manejar envío del formulario con Enter
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+    });
+
+    // Navegación por teclado mejorada
+    usernameInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && validateForm()) {
+        createRoomButton.focus();
+      }
+        });
+    </script>
+</body>
+</html>

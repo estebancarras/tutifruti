@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Unirse a sala de Tutifrutti - Encuentra salas activas o ingresa un código para jugar">
+  <title>Unirse a Sala - Tutifrutti</title>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="/public/css/base.css">
+  <link rel="stylesheet" href="/public/css/components.css">
+  
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+  
+  <style>
+    .page-layout {
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--color-primary) 0%, #764ba2 100%);
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .page-header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: var(--space-4) 0;
+      box-shadow: var(--shadow);
+    }
+    
+    .page-header__content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .page-title {
+      font-family: var(--font-secondary);
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-gray-800);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .back-link {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-weight: var(--font-weight-medium);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      transition: color var(--transition-fast);
+    }
+    
+    .back-link:hover {
+      color: var(--color-primary-dark);
+    }
+    
+    .page-main {
+      flex: 1;
+      padding: var(--space-6);
+    }
+    
+    .join-container {
+      max-width: 800px;
+      margin: 0 auto;
+      display: grid;
+      gap: var(--space-6);
+    }
+    
+    .join-form-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius-2xl);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .join-form-card__header {
+      text-align: center;
+      margin-bottom: var(--space-6);
+    }
+    
+    .join-form-card__title {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-gray-800);
+      margin-bottom: var(--space-2);
+    }
+    
+    .join-form-card__subtitle {
+      color: var(--color-gray-600);
+      font-size: var(--text-sm);
+    }
+    
+    .rooms-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius-2xl);
+      padding: var(--space-6);
+      box-shadow: var(--shadow-lg);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .rooms-card__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-6);
+    }
+    
+    .rooms-card__title {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-gray-800);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .refresh-button {
+      background: none;
+      border: 1px solid var(--color-gray-300);
+      color: var(--color-gray-600);
+      padding: var(--space-2);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .refresh-button:hover {
+      background: var(--color-gray-100);
+      border-color: var(--color-gray-400);
+    }
+    
+    .refresh-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .rooms-list {
+      display: grid;
+      gap: var(--space-3);
+    }
+    
+    .room-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-4);
+      background: var(--color-white);
+      border-radius: var(--radius-xl);
+      border: 2px solid var(--color-gray-200);
+      transition: all var(--transition-normal);
+    }
+    
+    .room-item:hover {
+      border-color: var(--color-primary);
+      box-shadow: var(--shadow);
+      transform: translateY(-2px);
+    }
+    
+    .room-info {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .room-name {
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-gray-800);
+      margin-bottom: var(--space-1);
+      font-size: var(--text-base);
+    }
+    
+    .room-details {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--color-gray-600);
+    }
+    
+    .room-code {
+      font-family: 'Monaco', 'Menlo', monospace;
+      background: var(--color-gray-100);
+      padding: var(--space-1) var(--space-2);
+      border-radius: var(--radius);
+      font-weight: var(--font-weight-medium);
+    }
+    
+    .room-players {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+    }
+    
+    .room-actions {
+      display: flex;
+      gap: var(--space-2);
+    }
+    
+    .btn--icon {
+      padding: var(--space-2);
+      min-width: auto;
+      aspect-ratio: 1;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: var(--space-8) var(--space-4);
+      color: var(--color-gray-500);
+    }
+    
+    .empty-state__icon {
+      font-size: var(--text-4xl);
+      margin-bottom: var(--space-4);
+      opacity: 0.5;
+    }
+    
+    .empty-state__title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      margin-bottom: var(--space-2);
+      color: var(--color-gray-700);
+    }
+    
+    .empty-state__description {
+      font-size: var(--text-sm);
+      line-height: 1.6;
+    }
+    
+    .loading-state {
+      text-align: center;
+      padding: var(--space-6);
+      color: var(--color-gray-600);
+    }
+    
+    .loading-state .spinner {
+      margin-bottom: var(--space-3);
+    }
+    
+    @media (max-width: 768px) {
+      .page-main {
+        padding: var(--space-4);
+      }
+      
+      .join-container {
+        gap: var(--space-4);
+      }
+      
+      .join-form-card,
+      .rooms-card {
+        padding: var(--space-4);
+      }
+      
+      .room-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-3);
+      }
+      
+      .room-actions {
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body class="page-layout">
+  <header class="page-header">
+    <div class="container">
+      <div class="page-header__content">
+        <h1 class="page-title">
+          <span aria-hidden="true">🚪</span>
+          Unirse a Sala
+        </h1>
+        <a href="/index.html" class="back-link">
+          <span aria-hidden="true">←</span>
+          Volver al inicio
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="page-main">
+    <div class="join-container">
+      <!-- Formulario para unirse por código -->
+      <div class="join-form-card">
+        <div class="join-form-card__header">
+          <h2 class="join-form-card__title">Unirse con código</h2>
+          <p class="join-form-card__subtitle">
+            ¿Tienes el código de una sala? Ingrésalo aquí
+          </p>
+        </div>
+
+        <form id="joinRoomForm" novalidate>
+          <div class="input-group">
+            <input 
+              type="text" 
+              id="roomCodeInput" 
+              name="roomCode"
+              class="form-input" 
+              placeholder="Código de la sala"
+              maxlength="15"
+              autocomplete="off"
+              aria-describedby="roomCode-help"
+              style="text-transform: uppercase;"
+            >
+            <button type="submit" class="btn btn--primary" id="joinRoomButton">
+              <span aria-hidden="true">🚪</span>
+              Unirse
+            </button>
+          </div>
+          <div id="roomCode-help" class="form-help">
+            Ingresa el código que te compartió el anfitrión de la sala
+          </div>
+          <div class="form-error" id="roomCode-error" role="alert"></div>
+        </form>
+      </div>
+
+      <!-- Lista de salas disponibles -->
+      <div class="rooms-card">
+        <div class="rooms-card__header">
+          <h2 class="rooms-card__title">
+            <span aria-hidden="true">🏠</span>
+            Salas disponibles
+          </h2>
+          <button type="button" class="refresh-button" id="refreshRoomsButton" 
+                  aria-label="Actualizar lista de salas">
+            <span aria-hidden="true">🔄</span>
+            <span class="sm:hidden">Actualizar</span>
+          </button>
+        </div>
+
+        <div id="roomsList" role="region" aria-label="Lista de salas disponibles">
+          <!-- Contenido se carga dinámicamente -->
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { socketManager } from '/public/js/socket-manager.js';
+    import { storage, showNotification } from '/utils/helpers.js';
+    import { SOCKET_EVENTS, ROUTES, GAME_CONFIG } from '/utils/constants.js';
+
+    // Referencias a elementos
+    const joinRoomForm = document.getElementById('joinRoomForm');
+    const roomCodeInput = document.getElementById('roomCodeInput');
+    const roomCodeError = document.getElementById('roomCode-error');
+    const joinRoomButton = document.getElementById('joinRoomButton');
+    const refreshRoomsButton = document.getElementById('refreshRoomsButton');
+    const roomsList = document.getElementById('roomsList');
+
+    // Estado
+    let availableRooms = [];
+    let isLoading = false;
+
+    // Inicialización
+    init();
+
+    function init() {
+      // Verificar que hay un usuario logueado
+      const username = storage.getUsername();
+      if (!username) {
+        showNotification('Debes ingresar tu nombre primero', 'error');
+        window.location.href = ROUTES.HOME;
+        return;
+      }
+
+      // Conectar socket
+      socketManager.connect();
+      setupSocketListeners();
+
+      // Event listeners
+      setupEventListeners();
+
+      // Cargar salas
+      loadRooms();
+
+      // Focus inicial
+      roomCodeInput.focus();
+    }
+
+    function setupEventListeners() {
+      // Unirse por código
+      joinRoomForm.addEventListener('submit', handleJoinByCode);
+      
+      // Formatear código en tiempo real
+      roomCodeInput.addEventListener('input', (e) => {
+        e.target.value = e.target.value.toUpperCase();
+        clearError();
+      });
+
+      // Refrescar salas
+      refreshRoomsButton.addEventListener('click', loadRooms);
+
+      // Auto-refresh cada 30 segundos
+      setInterval(loadRooms, 30000);
+    }
+
+    function setupSocketListeners() {
+      socketManager.on(SOCKET_EVENTS.ACTIVE_ROOMS, handleActiveRooms);
+      socketManager.on(SOCKET_EVENTS.JOINED_ROOM, handleJoinedRoom);
+      socketManager.on(SOCKET_EVENTS.PLAYER_JOINED, handlePlayerJoined);
+      socketManager.on(SOCKET_EVENTS.PLAYER_LEFT, handlePlayerLeft);
+      socketManager.on(SOCKET_EVENTS.SHOW_ROULETTE, handleGameStart);
+    }
+
+    function handleJoinByCode(e) {
+      e.preventDefault();
+      
+      const roomCode = roomCodeInput.value.trim().toUpperCase();
+      
+      if (!roomCode) {
+        showError('Por favor, ingresa un código de sala');
+        roomCodeInput.focus();
+        return;
+      }
+
+      joinRoom(roomCode);
+    }
+
+    function joinRoom(roomId) {
+      const username = storage.getUsername();
+      
+      if (!username) {
+        showNotification('Error: Usuario no válido', 'error');
+        return;
+      }
+
+      // Deshabilitar botón
+      joinRoomButton.disabled = true;
+      joinRoomButton.innerHTML = '<span class="spinner"></span> Uniéndose...';
+
+      // Unirse a la sala
+      socketManager.joinRoom({
+        roomId: roomId,
+        playerName: username
+      });
+    }
+
+    function handleJoinedRoom(data) {
+      console.log('Unido a sala:', data);
+      
+      // Guardar sala actual
+      storage.setCurrentRoomId(data.roomId);
+      
+      showNotification('¡Te has unido a la sala! Esperando a que el anfitrión inicie el juego...', 'success');
+      
+      // NO redirigir automáticamente - esperar evento de inicio de juego
+      // El usuario permanece en la sala de espera hasta que el creador inicie
+      showWaitingRoom(data);
+    }
+
+    function loadRooms() {
+      if (isLoading) return;
+      
+      isLoading = true;
+      showLoadingState();
+      
+      // Solicitar salas del servidor
+      socketManager.getRooms();
+      
+      // También cargar desde localStorage como fallback
+      const localRooms = storage.getRooms();
+      if (localRooms.length > 0) {
+        handleActiveRooms(localRooms);
+      }
+      
+      // Timeout para evitar loading infinito
+      setTimeout(() => {
+        if (isLoading) {
+          isLoading = false;
+          if (availableRooms.length === 0) {
+            showEmptyState();
+          }
+        }
+      }, 5000);
+    }
+
+    function handleActiveRooms(rooms) {
+      console.log('Salas activas recibidas:', rooms);
+      
+      isLoading = false;
+      availableRooms = Array.isArray(rooms) ? rooms : [];
+      
+      // Filtrar salas recientes (últimas 24 horas)
+      const oneDayAgo = new Date();
+      oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+      
+      availableRooms = availableRooms.filter(room => {
+        if (!room.createdAt) return true;
+        return new Date(room.createdAt) > oneDayAgo;
+      });
+
+      renderRoomsList();
+    }
+
+    function renderRoomsList() {
+      if (availableRooms.length === 0) {
+        showEmptyState();
+        return;
+      }
+
+      roomsList.innerHTML = `
+        <div class="rooms-list">
+          ${availableRooms.map(room => createRoomItem(room)).join('')}
+        </div>
+      `;
+
+      // Añadir event listeners
+      addRoomEventListeners();
+    }
+
+    function createRoomItem(room) {
+      const isFull = room.currentPlayers >= (room.maxPlayers || GAME_CONFIG.MAX_PLAYERS);
+      const joinButtonDisabled = isFull ? 'disabled' : '';
+      const joinButtonText = isFull ? 'Llena' : 'Unirse';
+      const joinButtonIcon = isFull ? '🚫' : '🚪';
+
+      return `
+        <div class="room-item" data-room-id="${room.roomId}">
+          <div class="room-info">
+            <div class="room-name">${room.roomName || 'Sala sin nombre'}</div>
+            <div class="room-details">
+              <span class="room-code">${room.roomId}</span>
+              <span class="room-players">
+                <span aria-hidden="true">👥</span>
+                ${room.currentPlayers || 1}/${room.maxPlayers || GAME_CONFIG.MAX_PLAYERS}
+              </span>
+              ${room.creator ? `<span>Por ${room.creator}</span>` : ''}
+            </div>
+          </div>
+          <div class="room-actions">
+            <button type="button" 
+                    class="btn btn--primary btn--sm join-room-btn" 
+                    data-room-id="${room.roomId}"
+                    data-room-name="${room.roomName || 'Sala sin nombre'}"
+                    ${joinButtonDisabled}
+                    aria-label="Unirse a ${room.roomName || 'sala sin nombre'}">
+              <span aria-hidden="true">${joinButtonIcon}</span>
+              ${joinButtonText}
+            </button>
+            <button type="button" 
+                    class="btn btn--ghost btn--icon delete-room-btn" 
+                    data-room-id="${room.roomId}"
+                    aria-label="Eliminar sala de la lista">
+              <span aria-hidden="true">🗑️</span>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function addRoomEventListeners() {
+      // Botones de unirse
+      document.querySelectorAll('.join-room-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const roomId = e.target.dataset.roomId;
+          const roomName = e.target.dataset.roomName;
+          
+          if (roomId) {
+            // Confirmación opcional para mejor UX
+            if (confirm(`¿Unirse a "${roomName}"?`)) {
+              joinRoom(roomId);
+            }
+          }
+        });
+      });
+
+      // Botones de eliminar
+      document.querySelectorAll('.delete-room-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+          const roomId = e.target.dataset.roomId;
+          
+          if (roomId && confirm('¿Eliminar esta sala de la lista?')) {
+            deleteRoom(roomId);
+          }
+        });
+      });
+    }
+
+    function deleteRoom(roomId) {
+      // Eliminar del localStorage
+      let rooms = storage.getRooms();
+      rooms = rooms.filter(room => room.roomId !== roomId);
+      storage.set('rooms', rooms);
+
+      // Actualizar lista
+      availableRooms = availableRooms.filter(room => room.roomId !== roomId);
+      renderRoomsList();
+
+      showNotification('Sala eliminada de la lista', 'info');
+    }
+
+    function showWaitingRoom(data) {
+      // Ocultar formularios de unión
+      document.querySelector('.join-container').style.display = 'none';
+      
+      // Crear y mostrar sala de espera
+      const waitingRoom = document.createElement('div');
+      waitingRoom.className = 'waiting-room-container';
+      waitingRoom.innerHTML = `
+        <div class="waiting-room-card">
+          <div class="waiting-room-header">
+            <h2 class="waiting-room-title">¡Te has unido a la sala!</h2>
+            <div class="room-info-display">
+              <div class="room-name-display">${data.roomName || 'Sala sin nombre'}</div>
+              <div class="room-code-display">Código: <strong>${data.roomId}</strong></div>
+            </div>
+          </div>
+          
+          <div class="waiting-room-content">
+            <div class="players-section">
+              <h3>Jugadores en la sala</h3>
+              <div class="players-count">
+                <span id="waiting-players-count">${data.players?.length || 1}</span>/${GAME_CONFIG.MAX_PLAYERS}
+              </div>
+              <div class="players-list" id="waiting-players-list" role="list">
+                <!-- Se llena dinámicamente -->
+              </div>
+            </div>
+            
+            <div class="waiting-status">
+              <div class="waiting-icon">⏳</div>
+              <div class="waiting-message">Esperando a que el anfitrión inicie el juego...</div>
+            </div>
+          </div>
+          
+          <div class="waiting-room-actions">
+            <button type="button" class="btn btn--ghost" onclick="leaveRoom()">
+              <span aria-hidden="true">🚪</span>
+              Salir de la sala
+            </button>
+          </div>
+        </div>
+      `;
+      
+      // Agregar estilos para la sala de espera
+      const style = document.createElement('style');
+      style.textContent = `
+        .waiting-room-container {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100vh;
+          background: linear-gradient(135deg, var(--color-primary) 0%, #764ba2 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+        
+        .waiting-room-card {
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(10px);
+          border-radius: var(--radius-2xl);
+          padding: var(--space-8);
+          box-shadow: var(--shadow-2xl);
+          border: 1px solid rgba(255, 255, 255, 0.3);
+          max-width: 500px;
+          width: 90%;
+          text-align: center;
+        }
+        
+        .waiting-room-title {
+          font-size: var(--text-2xl);
+          font-weight: var(--font-weight-semibold);
+          color: var(--color-gray-800);
+          margin-bottom: var(--space-4);
+        }
+        
+        .room-info-display {
+          background: var(--color-gray-50);
+          border-radius: var(--radius-lg);
+          padding: var(--space-4);
+          margin-bottom: var(--space-6);
+        }
+        
+        .room-name-display {
+          font-size: var(--text-lg);
+          font-weight: var(--font-weight-medium);
+          color: var(--color-gray-800);
+          margin-bottom: var(--space-2);
+        }
+        
+        .room-code-display {
+          color: var(--color-gray-600);
+          font-size: var(--text-sm);
+        }
+        
+        .players-section h3 {
+          font-size: var(--text-lg);
+          font-weight: var(--font-weight-medium);
+          color: var(--color-gray-800);
+          margin-bottom: var(--space-3);
+        }
+        
+        .players-count {
+          font-size: var(--text-xl);
+          font-weight: var(--font-weight-semibold);
+          color: var(--color-primary);
+          margin-bottom: var(--space-4);
+        }
+        
+        .players-list {
+          display: grid;
+          gap: var(--space-2);
+          margin-bottom: var(--space-6);
+        }
+        
+        .waiting-player-item {
+          display: flex;
+          align-items: center;
+          gap: var(--space-3);
+          padding: var(--space-3);
+          background: var(--color-gray-50);
+          border-radius: var(--radius-lg);
+        }
+        
+        .waiting-player-avatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background: var(--color-primary);
+          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: var(--font-weight-semibold);
+        }
+        
+        .waiting-player-name {
+          flex: 1;
+          text-align: left;
+          font-weight: var(--font-weight-medium);
+          color: var(--color-gray-800);
+        }
+        
+        .waiting-player-badge {
+          background: var(--color-primary);
+          color: white;
+          padding: var(--space-1) var(--space-2);
+          border-radius: var(--radius);
+          font-size: var(--text-xs);
+          font-weight: var(--font-weight-medium);
+        }
+        
+        .waiting-status {
+          margin-bottom: var(--space-6);
+        }
+        
+        .waiting-icon {
+          font-size: var(--text-4xl);
+          margin-bottom: var(--space-3);
+        }
+        
+        .waiting-message {
+          color: var(--color-gray-600);
+          font-size: var(--text-base);
+        }
+      `;
+      
+      document.head.appendChild(style);
+      document.body.appendChild(waitingRoom);
+      
+      // Actualizar lista de jugadores
+      updateWaitingPlayersList(data.players || []);
+    }
+
+    function updateWaitingPlayersList(players) {
+      const playersList = document.getElementById('waiting-players-list');
+      const playersCount = document.getElementById('waiting-players-count');
+      
+      if (!playersList || !playersCount) return;
+      
+      playersCount.textContent = players.length;
+      playersList.innerHTML = '';
+      
+      players.forEach(player => {
+        const playerItem = document.createElement('div');
+        playerItem.className = 'waiting-player-item';
+        playerItem.innerHTML = `
+          <div class="waiting-player-avatar">${player.name.charAt(0).toUpperCase()}</div>
+          <div class="waiting-player-name">${player.name}</div>
+          ${player.isCreator ? '<div class="waiting-player-badge">Anfitrión</div>' : ''}
+        `;
+        playersList.appendChild(playerItem);
+      });
+    }
+
+    function handlePlayerJoined(data) {
+      console.log('Jugador se unió:', data);
+      
+      if (data.players) {
+        updateWaitingPlayersList(data.players);
+        
+        const playerName = data.player?.name;
+        if (playerName) {
+          showNotification(`${playerName} se unió a la sala`, 'info');
+        }
+      }
+    }
+
+    function handlePlayerLeft(data) {
+      console.log('Jugador se fue:', data);
+      
+      if (data.players) {
+        updateWaitingPlayersList(data.players);
+        
+        if (data.playerName) {
+          showNotification(`${data.playerName} dejó la sala`, 'info');
+        }
+      }
+    }
+
+    function handleGameStart(data) {
+      console.log('Juego iniciado:', data);
+      
+      // Redirigir al juego cuando el creador lo inicia
+      showNotification('¡El juego ha comenzado!', 'success');
+      
+      setTimeout(() => {
+        const currentRoomId = storage.getCurrentRoomId();
+        window.location.href = `${ROUTES.GAME}?roomId=${currentRoomId}`;
+      }, 1000);
+    }
+
+    function leaveRoom() {
+      if (confirm('¿Estás seguro de que quieres salir de la sala?')) {
+        // Limpiar datos locales
+        storage.setCurrentRoomId(null);
+        
+        // Recargar la página para volver al estado inicial
+        window.location.reload();
+      }
+    }
+
+    function showLoadingState() {
+      roomsList.innerHTML = `
+        <div class="loading-state">
+          <div class="spinner spinner--lg"></div>
+          <div>Buscando salas disponibles...</div>
+        </div>
+      `;
+    }
+
+    function showEmptyState() {
+      roomsList.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state__icon" aria-hidden="true">🏠</div>
+          <div class="empty-state__title">No hay salas disponibles</div>
+          <div class="empty-state__description">
+            No se encontraron salas activas en este momento.<br>
+            Puedes crear una nueva sala o intentar unirte usando un código.
+          </div>
+        </div>
+      `;
+    }
+
+    function showError(message) {
+      roomCodeError.textContent = message;
+      roomCodeInput.classList.add('form-input--error');
+      roomCodeInput.setAttribute('aria-invalid', 'true');
+    }
+
+    function clearError() {
+      roomCodeError.textContent = '';
+      roomCodeInput.classList.remove('form-input--error');
+      roomCodeInput.removeAttribute('aria-invalid');
+    }
+
+    // Re-habilitar botón si hay error
+    socketManager.on(SOCKET_EVENTS.ERROR, (error) => {
+      joinRoomButton.disabled = false;
+      joinRoomButton.innerHTML = '<span aria-hidden="true">🚪</span> Unirse';
+      
+      if (error.message.includes('sala')) {
+        showError(error.message);
+        roomCodeInput.focus();
+      }
+    });
+  </script>
+</body>
+</html>

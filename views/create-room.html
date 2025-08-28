@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Crear sala de Tutifrutti - Configura tu partida y comparte el código con tus amigos">
+  <title>Crear Sala - Tutifrutti</title>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="/public/css/base.css">
+  <link rel="stylesheet" href="/public/css/components.css">
+  
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+  
+  <style>
+    .page-layout {
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--color-primary) 0%, #764ba2 100%);
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .page-header {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: var(--space-4) 0;
+      box-shadow: var(--shadow);
+    }
+    
+    .page-header__content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .page-title {
+      font-family: var(--font-secondary);
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-gray-800);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .back-link {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-weight: var(--font-weight-medium);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      transition: color var(--transition-fast);
+    }
+    
+    .back-link:hover {
+      color: var(--color-primary-dark);
+    }
+    
+    .page-main {
+      flex: 1;
+      padding: var(--space-8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .create-room-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: var(--radius-2xl);
+      padding: var(--space-8);
+      box-shadow: var(--shadow-2xl);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      width: 100%;
+      max-width: 600px;
+    }
+    
+    .create-room-card__header {
+      text-align: center;
+      margin-bottom: var(--space-8);
+    }
+    
+    .create-room-card__title {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-gray-800);
+      margin-bottom: var(--space-3);
+    }
+    
+    .create-room-card__subtitle {
+      color: var(--color-gray-600);
+      font-size: var(--text-base);
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-4);
+    }
+    
+    .players-section {
+      background: var(--color-gray-50);
+      border-radius: var(--radius-xl);
+      padding: var(--space-6);
+      margin: var(--space-6) 0;
+      border: 2px solid var(--color-gray-200);
+    }
+    
+    .players-section__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--space-4);
+    }
+    
+    .players-section__title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-gray-800);
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    
+    .players-count {
+      font-size: var(--text-sm);
+      color: var(--color-gray-600);
+      background: var(--color-white);
+      padding: var(--space-1) var(--space-3);
+      border-radius: var(--radius-full);
+      border: 1px solid var(--color-gray-300);
+    }
+    
+    .players-list {
+      display: grid;
+      gap: var(--space-3);
+    }
+    
+    .player-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      background: var(--color-white);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-gray-200);
+    }
+    
+    .player-avatar {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-white);
+      font-weight: var(--font-weight-semibold);
+      font-size: var(--text-sm);
+    }
+    
+    .player-name {
+      flex: 1;
+      font-weight: var(--font-weight-medium);
+      color: var(--color-gray-800);
+    }
+    
+    .player-badge {
+      font-size: var(--text-xs);
+      padding: var(--space-1) var(--space-2);
+      background: var(--color-accent);
+      color: var(--color-white);
+      border-radius: var(--radius-full);
+      font-weight: var(--font-weight-medium);
+    }
+    
+    .room-info {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      color: var(--color-white);
+      border-radius: var(--radius-xl);
+      padding: var(--space-6);
+      margin: var(--space-6) 0;
+      text-align: center;
+    }
+    
+    .room-info__title {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--space-4);
+    }
+    
+    .room-code {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin: var(--space-4) 0;
+    }
+    
+    .room-code__label {
+      font-size: var(--text-sm);
+      opacity: 0.9;
+      margin-bottom: var(--space-2);
+    }
+    
+    .room-code__value {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      font-family: 'Monaco', 'Menlo', monospace;
+      letter-spacing: 2px;
+      user-select: all;
+      cursor: pointer;
+    }
+    
+    .room-code__copy {
+      background: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: var(--color-white);
+      margin-top: var(--space-3);
+    }
+    
+    .room-code__copy:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    @media (max-width: 768px) {
+      .page-main {
+        padding: var(--space-4);
+      }
+      
+      .create-room-card {
+        padding: var(--space-6);
+      }
+      
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body class="page-layout">
+  <header class="page-header">
+    <div class="container">
+      <div class="page-header__content">
+        <h1 class="page-title">
+          <span aria-hidden="true">🎮</span>
+          Crear Sala
+        </h1>
+        <a href="/index.html" class="back-link">
+          <span aria-hidden="true">←</span>
+          Volver al inicio
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="page-main">
+    <div class="create-room-card">
+      <!-- Formulario inicial -->
+      <div id="setupForm">
+        <div class="create-room-card__header">
+          <h2 class="create-room-card__title">Configurar nueva sala</h2>
+          <p class="create-room-card__subtitle">
+            Personaliza tu sala de juego y comparte el código con tus amigos
+          </p>
+        </div>
+
+        <form id="createRoomForm" novalidate>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="playerName" class="form-label form-label--required">
+                Tu nombre
+              </label>
+              <input 
+                type="text" 
+                id="playerName" 
+                name="playerName"
+                class="form-input" 
+                placeholder="Tu nombre"
+                required
+                readonly
+                tabindex="-1"
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="roomName" class="form-label">
+                Nombre de la sala
+              </label>
+              <input 
+                type="text" 
+                id="roomName" 
+                name="roomName"
+                class="form-input" 
+                placeholder="Mi sala de Tutifrutti"
+                maxlength="30"
+                aria-describedby="roomName-help"
+              >
+              <span id="roomName-help" class="form-help">
+                Opcional. Máximo 30 caracteres.
+              </span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <button type="submit" id="createRoomButton" class="btn btn--primary btn--full">
+              <span aria-hidden="true">🚀</span>
+              Crear Sala
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Información de la sala creada -->
+      <div id="roomInfo" class="hidden">
+        <div class="room-info">
+          <h2 class="room-info__title" id="roomTitle">Sala creada</h2>
+          
+          <div class="room-code">
+            <div class="room-code__label">Código de la sala</div>
+            <div class="room-code__value" id="roomCodeValue" 
+                 tabindex="0" 
+                 role="button"
+                 aria-label="Código de sala, hacer clic para copiar">
+              <!-- Se llenará por JavaScript -->
+            </div>
+            <button type="button" class="btn btn--ghost room-code__copy" id="copyCodeButton">
+              <span aria-hidden="true">📋</span>
+              Copiar código
+            </button>
+          </div>
+        </div>
+
+        <div class="players-section">
+          <div class="players-section__header">
+            <h3 class="players-section__title">
+              <span aria-hidden="true">👥</span>
+              Jugadores en la sala
+            </h3>
+            <div class="players-count" id="playersCountDisplay">
+              1/5
+            </div>
+          </div>
+          
+          <div class="players-list" id="playersList" role="list">
+            <!-- Se llenará por JavaScript -->
+          </div>
+        </div>
+
+        <div class="btn-group">
+          <button type="button" id="goToGameButton" class="btn btn--success btn--lg">
+            <span aria-hidden="true">🎮</span>
+            Iniciar Juego
+          </button>
+          <button type="button" id="newRoomButton" class="btn btn--outline">
+            <span aria-hidden="true">🔄</span>
+            Nueva Sala
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { socketManager } from '/public/js/socket-manager.js';
+    import { storage, generateRoomId, showNotification } from '/utils/helpers.js';
+    import { SOCKET_EVENTS, ROUTES, GAME_CONFIG } from '/utils/constants.js';
+
+    // Referencias a elementos
+    const setupForm = document.getElementById('setupForm');
+    const roomInfo = document.getElementById('roomInfo');
+    const createRoomForm = document.getElementById('createRoomForm');
+    const playerNameInput = document.getElementById('playerName');
+    const roomNameInput = document.getElementById('roomName');
+    const createRoomButton = document.getElementById('createRoomButton');
+    const roomTitle = document.getElementById('roomTitle');
+    const roomCodeValue = document.getElementById('roomCodeValue');
+    const copyCodeButton = document.getElementById('copyCodeButton');
+    const playersCountDisplay = document.getElementById('playersCountDisplay');
+    const playersList = document.getElementById('playersList');
+    const goToGameButton = document.getElementById('goToGameButton');
+    const newRoomButton = document.getElementById('newRoomButton');
+
+    // Estado de la sala
+    let roomData = {
+      roomId: '',
+      roomName: '',
+      players: [],
+      isCreated: false
+    };
+
+    // Inicialización
+    init();
+
+    function init() {
+      // Verificar que hay un usuario logueado
+      const username = storage.getUsername();
+      if (!username) {
+        showNotification('Debes ingresar tu nombre primero', 'error');
+        window.location.href = ROUTES.HOME;
+        return;
+      }
+
+      // Mostrar nombre del usuario
+      playerNameInput.value = username;
+
+      // Conectar socket
+      socketManager.connect();
+      setupSocketListeners();
+
+      // Event listeners
+      setupEventListeners();
+    }
+
+    function setupEventListeners() {
+      // Crear sala
+      createRoomForm.addEventListener('submit', handleCreateRoom);
+
+      // Copiar código
+      copyCodeButton.addEventListener('click', copyRoomCode);
+      roomCodeValue.addEventListener('click', copyRoomCode);
+      roomCodeValue.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          copyRoomCode();
+        }
+      });
+
+      // Iniciar juego: emitir y esperar evento SHOW_ROULETTE para redirigir
+      goToGameButton.addEventListener('click', () => {
+        if (roomData.roomId && roomData.players.length >= 2) {
+          socketManager.startGame(roomData.roomId);
+          goToGameButton.disabled = true;
+          goToGameButton.innerHTML = '<span class="spinner"></span> Iniciando juego...';
+          showNotification('Iniciando juego...', 'info');
+        } else {
+          showNotification('Se necesitan al menos 2 jugadores para iniciar', 'warning');
+        }
+      });
+
+      // Nueva sala
+      newRoomButton.addEventListener('click', () => {
+        window.location.reload();
+      });
+
+      // Auto-focus en el nombre de la sala
+      roomNameInput.focus();
+    }
+
+    function setupSocketListeners() {
+      socketManager.on(SOCKET_EVENTS.ROOM_CREATED, handleRoomCreated);
+      socketManager.on(SOCKET_EVENTS.JOINED_ROOM, handleJoinedRoom);
+      socketManager.on(SOCKET_EVENTS.PLAYER_JOINED, handlePlayerJoined);
+      socketManager.on(SOCKET_EVENTS.PLAYER_LEFT, handlePlayerLeft);
+      socketManager.on(SOCKET_EVENTS.SHOW_ROULETTE, () => {
+        if (roomData.roomId) {
+          window.location.href = `${ROUTES.GAME}?roomId=${roomData.roomId}`;
+        }
+      });
+    }
+
+    function handleCreateRoom(e) {
+      e.preventDefault();
+      
+      const username = storage.getUsername();
+      const roomName = roomNameInput.value.trim() || `Sala de ${username}`;
+      
+      if (!username) {
+        showNotification('Error: Usuario no válido', 'error');
+        return;
+      }
+
+      // Deshabilitar botón
+      createRoomButton.disabled = true;
+      createRoomButton.innerHTML = '<span class="spinner"></span> Creando...';
+
+      // Generar ID y crear sala
+      roomData.roomId = generateRoomId();
+      roomData.roomName = roomName;
+
+      socketManager.createRoom({
+        playerName: username,
+        roomName: roomName,
+        maxPlayers: GAME_CONFIG.MAX_PLAYERS
+      });
+    }
+
+    function handleRoomCreated(data) {
+      console.log('Sala creada:', data);
+      showNotification('¡Sala creada con éxito!', 'success');
+      
+      // Actualizar datos
+      roomData.roomId = data.roomId;
+      roomData.roomName = data.roomName;
+      roomData.isCreated = true;
+
+      // Guardar en localStorage
+      storage.saveRoom(data);
+      storage.setCurrentRoomId(data.roomId);
+
+      // Mostrar información de la sala
+      showRoomInfo();
+    }
+
+    function handleJoinedRoom(data) {
+      console.log('Unido a sala:', data);
+      
+      // Actualizar lista de jugadores
+      roomData.players = data.players || [];
+      updatePlayersList();
+    }
+
+    function handlePlayerJoined(data) {
+      console.log('Jugador se unió:', data);
+      
+      if (data.players) {
+        roomData.players = data.players;
+        updatePlayersList();
+        
+        const playerName = data.player?.name;
+        if (playerName) {
+          showNotification(`${playerName} se unió a la sala`, 'info');
+        }
+      }
+    }
+
+    function handlePlayerLeft(data) {
+      console.log('Jugador se fue:', data);
+      
+      if (data.players) {
+        roomData.players = data.players;
+        updatePlayersList();
+        
+        if (data.playerName) {
+          showNotification(`${data.playerName} dejó la sala`, 'info');
+        }
+      }
+    }
+
+    function showRoomInfo() {
+      setupForm.classList.add('hidden');
+      roomInfo.classList.remove('hidden');
+      
+      // Actualizar contenido
+      roomTitle.textContent = roomData.roomName;
+      roomCodeValue.textContent = roomData.roomId;
+      
+      updatePlayersList();
+      
+      // Focus en el código para mejor accesibilidad
+      roomCodeValue.focus();
+    }
+
+    function updatePlayersList() {
+      const count = roomData.players.length;
+      
+      // Actualizar contador
+      playersCountDisplay.textContent = `${count}/${GAME_CONFIG.MAX_PLAYERS}`;
+      
+      // Limpiar lista
+      playersList.innerHTML = '';
+      
+      // Agregar jugadores
+      roomData.players.forEach((player, index) => {
+        const playerItem = createPlayerItem(player, index === 0);
+        playersList.appendChild(playerItem);
+      });
+      
+      // Habilitar/deshabilitar botón de juego
+      goToGameButton.disabled = count < 2;
+      if (count < 2) {
+        goToGameButton.innerHTML = '<span aria-hidden="true">⏳</span> Esperando jugadores...';
+      } else {
+        goToGameButton.innerHTML = '<span aria-hidden="true">🎮</span> Iniciar Juego';
+      }
+    }
+
+    function createPlayerItem(player, isCreator) {
+      const item = document.createElement('div');
+      item.className = 'player-item';
+      item.setAttribute('role', 'listitem');
+      
+      const avatar = document.createElement('div');
+      avatar.className = 'player-avatar';
+      avatar.textContent = player.name.charAt(0).toUpperCase();
+      avatar.setAttribute('aria-hidden', 'true');
+      
+      const name = document.createElement('div');
+      name.className = 'player-name';
+      name.textContent = player.name;
+      
+      item.appendChild(avatar);
+      item.appendChild(name);
+      
+      if (isCreator) {
+        const badge = document.createElement('div');
+        badge.className = 'player-badge';
+        badge.textContent = 'Anfitrión';
+        badge.setAttribute('aria-label', 'Anfitrión de la sala');
+        item.appendChild(badge);
+      }
+      
+      return item;
+    }
+
+    async function copyRoomCode() {
+      try {
+        await navigator.clipboard.writeText(roomData.roomId);
+        showNotification('¡Código copiado al portapapeles!', 'success');
+        
+        // Feedback visual
+        copyCodeButton.innerHTML = '<span aria-hidden="true">✅</span> ¡Copiado!';
+        setTimeout(() => {
+          copyCodeButton.innerHTML = '<span aria-hidden="true">📋</span> Copiar código';
+        }, 2000);
+        
+      } catch (err) {
+        console.error('Error al copiar:', err);
+        showNotification('No se pudo copiar el código', 'error');
+        
+        // Fallback: seleccionar el texto
+        roomCodeValue.focus();
+        const range = document.createRange();
+        range.selectNodeContents(roomCodeValue);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+    }
+  </script>
+</body>
+</html>

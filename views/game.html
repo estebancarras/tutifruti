@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Jugar Tutifrutti - Completa las categorías con palabras que empiecen con la letra seleccionada">
+  <title>Juego - Tutifrutti</title>
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="/public/css/base.css">
+  <link rel="stylesheet" href="/public/css/components.css">
+  <link rel="stylesheet" href="/public/css/game.css">
+  
+  <!-- Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="game-layout">
+  <!-- Header del juego -->
+  <header class="game-header">
+    <div class="container">
+      <div class="game-header__content">
+        <h1 class="game-title">
+          <span class="game-title__emoji" aria-hidden="true">🍎</span>
+          Tutti Frutti
+        </h1>
+        <div class="game-info">
+          <div class="player-name" id="playerName" aria-live="polite">
+            Jugador: Cargando...
+          </div>
+          <div class="players-count" id="playersCount" aria-live="polite">
+            Jugadores: 0/5
+          </div>
+          <div class="timer-display" id="timerDisplay" role="timer" aria-live="assertive">
+            Esperando...
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenido principal -->
+  <main id="main-content" class="game-main">
+    <!-- Panel de estado del juego -->
+    <section class="game-status">
+      <div class="status-message" id="selectedLetter" aria-live="polite">
+        Esperando que comience el juego...
+      </div>
+      <div id="roulette" style="display: none;" role="img" aria-label="Ruleta de letras">
+        <!-- Contenido se genera dinámicamente -->
+      </div>
+    </section>
+
+    <!-- Área de juego -->
+    <section class="game-area">
+      <!-- Showcase de letra seleccionada -->
+      <div class="letter-showcase">
+        <div class="letter-label">LETRA SELECCIONADA</div>
+        <div class="letter-big" id="currentLetterDisplay" 
+             role="img" 
+             aria-label="Letra actual">?</div>
+      </div>
+
+      <!-- Tabla de categorías -->
+      <div class="game-table-container">
+        <table class="game-table" role="table" aria-label="Tabla de categorías del juego">
+          <thead>
+            <tr class="table-header" role="row">
+              <th class="category-header" role="columnheader" scope="col">
+                <span class="category-icon" aria-hidden="true">👤</span>
+                <span class="category-title">NOMBRE</span>
+              </th>
+              <th class="category-header" role="columnheader" scope="col">
+                <span class="category-icon" aria-hidden="true">🐾</span>
+                <span class="category-title">ANIMAL</span>
+              </th>
+              <th class="category-header" role="columnheader" scope="col">
+                <span class="category-icon" aria-hidden="true">📦</span>
+                <span class="category-title">COSA</span>
+              </th>
+              <th class="category-header" role="columnheader" scope="col">
+                <span class="category-icon" aria-hidden="true">🍎</span>
+                <span class="category-title">FRUTA</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Fila de inputs -->
+            <tr class="input-row" role="row">
+              <td class="input-cell" data-category="NOMBRE" role="cell">
+                <label for="input-NOMBRE" class="sr-only">Ingresa un nombre</label>
+                <input type="text" 
+                       id="input-NOMBRE"
+                       class="word-input" 
+                       data-category="NOMBRE" 
+                       placeholder="Ej: Ana..." 
+                       disabled
+                       autocomplete="off"
+                       maxlength="50">
+              </td>
+              <td class="input-cell" data-category="ANIMAL" role="cell">
+                <label for="input-ANIMAL" class="sr-only">Ingresa un animal</label>
+                <input type="text" 
+                       id="input-ANIMAL"
+                       class="word-input" 
+                       data-category="ANIMAL" 
+                       placeholder="Ej: Águila..." 
+                       disabled
+                       autocomplete="off"
+                       maxlength="50">
+              </td>
+              <td class="input-cell" data-category="COSA" role="cell">
+                <label for="input-COSA" class="sr-only">Ingresa una cosa</label>
+                <input type="text" 
+                       id="input-COSA"
+                       class="word-input" 
+                       data-category="COSA" 
+                       placeholder="Ej: Auto..." 
+                       disabled
+                       autocomplete="off"
+                       maxlength="50">
+              </td>
+              <td class="input-cell" data-category="FRUTA" role="cell">
+                <label for="input-FRUTA" class="sr-only">Ingresa una fruta</label>
+                <input type="text" 
+                       id="input-FRUTA"
+                       class="word-input" 
+                       data-category="FRUTA" 
+                       placeholder="Ej: Manzana..." 
+                       disabled
+                       autocomplete="off"
+                       maxlength="50">
+              </td>
+            </tr>
+            <!-- Fila de visualización -->
+            <tr class="display-row" role="row">
+              <td class="display-cell" role="cell">
+                <div class="word-display" id="display-NOMBRE">
+                  <span class="word-text" id="submitted-NOMBRE"></span>
+                  <span class="word-status"></span>
+                </div>
+              </td>
+              <td class="display-cell" role="cell">
+                <div class="word-display" id="display-ANIMAL">
+                  <span class="word-text" id="submitted-ANIMAL"></span>
+                  <span class="word-status"></span>
+                </div>
+              </td>
+              <td class="display-cell" role="cell">
+                <div class="word-display" id="display-COSA">
+                  <span class="word-text" id="submitted-COSA"></span>
+                  <span class="word-status"></span>
+                </div>
+              </td>
+              <td class="display-cell" role="cell">
+                <div class="word-display" id="display-FRUTA">
+                  <span class="word-text" id="submitted-FRUTA"></span>
+                  <span class="word-status"></span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Panel de puntuación -->
+    <section class="score-panel">
+      <h2 class="score-title">
+        <span aria-hidden="true">📊</span>
+        Puntuación
+      </h2>
+      <div class="score-grid" role="group" aria-label="Puntuaciones actuales">
+        <div class="score-item">
+          <span class="score-label">Repetidas</span>
+          <span class="score-value" id="score-repetidas" aria-label="Puntos por palabras repetidas">0</span>
+        </div>
+        <div class="score-item">
+          <span class="score-label">Únicas x2</span>
+          <span class="score-value" id="score-unicas" aria-label="Puntos por palabras únicas">0</span>
+        </div>
+        <div class="score-item">
+          <span class="score-label">+3 Sílabas x3</span>
+          <span class="score-value" id="score-silabas" aria-label="Puntos por palabras con más de 3 sílabas">0</span>
+        </div>
+        <div class="score-item total">
+          <span class="score-label">Total</span>
+          <span class="score-value" id="score-total" aria-label="Puntuación total">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Controles del juego -->
+    <section class="game-controls">
+      <button id="startGameButton" 
+              class="btn btn--primary btn--lg" 
+              style="display: none;"
+              aria-describedby="start-game-help">
+        <span aria-hidden="true">🎮</span>
+        Iniciar Juego
+      </button>
+      <div id="start-game-help" class="sr-only">
+        Solo el anfitrión puede iniciar el juego
+      </div>
+      
+      <button id="spinWheelButton" 
+              class="btn btn--secondary btn--lg" 
+              style="display: none;"
+              aria-describedby="spin-wheel-help">
+        <span aria-hidden="true">🎰</span>
+        Girar Ruleta
+      </button>
+      <div id="spin-wheel-help" class="sr-only">
+        Gira la ruleta para seleccionar una letra
+      </div>
+      
+      <button id="submitWordButton" 
+              class="btn btn--success btn--lg" 
+              disabled
+              aria-describedby="submit-words-help">
+        <span aria-hidden="true">✅</span>
+        Enviar Palabras
+      </button>
+      <div id="submit-words-help" class="sr-only">
+        Envía tus palabras cuando hayas terminado o se acabe el tiempo
+      </div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { socketManager } from '/public/js/socket-manager.js';
+    import { gameState } from '/public/js/game-state.js';
+    import { uiManager } from '/public/js/ui-manager.js';
+    import { storage, validateWord, showNotification } from '/utils/helpers.js';
+    import { SOCKET_EVENTS, ROUTES, GAME_CONFIG } from '/utils/constants.js';
+
+    // Referencias a elementos
+    const startGameButton = document.getElementById('startGameButton');
+    const spinWheelButton = document.getElementById('spinWheelButton');
+    const submitWordButton = document.getElementById('submitWordButton');
+    const playerNameElement = document.getElementById('playerName');
+
+    // Exponer para acceso global
+    window.gameModule = {
+      submitWords: submitWordsClassic
+    };
+
+    // Inicialización
+    init();
+
+    function init() {
+      // Verificar usuario y sala
+      const username = storage.getUsername();
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomId = urlParams.get('roomId') || storage.getCurrentRoomId();
+
+      if (!username) {
+        showNotification('Debes ingresar tu nombre primero', 'error');
+        window.location.href = ROUTES.HOME;
+        return;
+      }
+
+      if (!roomId) {
+        showNotification('No se especificó una sala válida', 'error');
+        window.location.href = ROUTES.CREATE_ROOM;
+        return;
+      }
+
+      // Configurar estado del juego
+      gameState.username = username;
+      gameState.roomId = roomId;
+
+      // Mostrar nombre del jugador
+      if (playerNameElement) {
+        playerNameElement.textContent = `Jugador: ${username}`;
+      }
+
+      // Inicializar componentes
+      uiManager.init();
+      
+      // Conectar socket y configurar eventos
+      socketManager.connect();
+      setupSocketListeners();
+      setupEventListeners();
+      setupWordInputEvents();
+
+      // NO unirse nuevamente - ya estamos unidos desde la sala de espera
+      // En su lugar, solicitar el estado actual de la sala
+      requestRoomState(roomId);
+
+      console.log('Juego inicializado:', { username, roomId });
+    }
+
+    function requestRoomState(roomId) {
+      // Verificar si venimos de la sala de espera (evitar doble unión)
+      const cameFromWaitingRoom = document.referrer.includes('join-room.html') || 
+                                  document.referrer.includes('create-room.html');
+      
+      // Siempre intentar rehidratar estado vía getRoomState y reconectar internamente
+      socketManager.getRoomState({ roomId });
+      console.log('Solicitando estado de sala');
+    }
+
+    function setupEventListeners() {
+      // Botón iniciar juego
+      startGameButton?.addEventListener('click', () => {
+        if (gameState.isHost) {
+          socketManager.startGame(gameState.roomId);
+        } else {
+          showNotification('Solo el anfitrión puede iniciar el juego', 'warning');
+        }
+      });
+
+      // Botón girar ruleta
+      spinWheelButton?.addEventListener('click', () => {
+        if (gameState.isHost && gameState.gameStarted) {
+          socketManager.spinRoulette(gameState.roomId);
+        } else if (!gameState.gameStarted) {
+          showNotification('El juego aún no ha comenzado', 'warning');
+        } else {
+          showNotification('Solo el anfitrión puede girar la ruleta', 'warning');
+        }
+      });
+
+      // Botón enviar palabras
+      submitWordButton?.addEventListener('click', submitWordsClassic);
+    }
+
+    function setupWordInputEvents() {
+      const wordInputs = document.querySelectorAll('.word-input');
+      
+      wordInputs.forEach((input, index) => {
+        // Navegación con Enter
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            moveToNextCategory(index);
+          }
+          
+          // Enviar con Ctrl+Enter
+          if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            submitWordsClassic();
+          }
+        });
+
+        // Validación en tiempo real
+        input.addEventListener('input', function() {
+          const category = this.getAttribute('data-category');
+          const word = this.value.trim();
+          const isValid = word ? validateWord(word, gameState.currentLetter) : false;
+          
+          // Actualizar visualización
+          uiManager.updateWordDisplay(category, word, isValid);
+          
+          // Verificar si todas las palabras están completas
+          checkAllWordsCompleted();
+        });
+
+        // Gestión del foco
+        input.addEventListener('focus', function() {
+          uiManager.setActiveInput(this);
+        });
+
+        input.addEventListener('blur', function() {
+          uiManager.removeActiveInput(this);
+        });
+      });
+    }
+
+    function setupSocketListeners() {
+      // Conexión y errores
+      socketManager.on(SOCKET_EVENTS.JOINED_ROOM, handleJoinedRoom);
+      socketManager.on(SOCKET_EVENTS.PLAYER_JOINED, handlePlayerJoined);
+      socketManager.on(SOCKET_EVENTS.PLAYER_LEFT, handlePlayerLeft);
+      
+      // Estado de la sala
+      socketManager.on(SOCKET_EVENTS.ROOM_STATE, handleRoomState);
+      
+      // Juego
+      socketManager.on(SOCKET_EVENTS.SHOW_ROULETTE, handleShowRoulette);
+      socketManager.on(SOCKET_EVENTS.ROULETTE_SPINNING, handleRouletteSpinning);
+      socketManager.on(SOCKET_EVENTS.ROULETTE_RESULT, handleRouletteResult);
+      socketManager.on(SOCKET_EVENTS.TIMER_UPDATE, handleTimerUpdate);
+      socketManager.on(SOCKET_EVENTS.ROUND_ENDED, handleRoundEnded);
+      socketManager.on(SOCKET_EVENTS.GAME_ENDED, handleGameEnded);
+      // Alineación con eventos adicionales
+      socketManager.on(SOCKET_EVENTS.YOU_ARE_CREATOR, () => {
+        gameState.setHost(true);
+        const startButton = document.getElementById('startGameButton');
+        if (startButton) startButton.style.display = 'block';
+      });
+      socketManager.on(SOCKET_EVENTS.NEW_ROUND, (data) => {
+        // Preparar UI para nueva ronda, letra y temporizador provendrán del servidor
+        gameState.currentRound = data.round;
+        document.getElementById('selectedLetter').textContent = 'Nueva ronda. Esperando ruleta...';
+        uiManager.showRoulette();
+      });
+    }
+
+    function handleRoomState(data) {
+      console.log('Estado de la sala recibido:', data);
+      
+      if (!data || !data.players) {
+        console.error('Estado de sala inválido:', data);
+        showNotification('Error al cargar el estado de la sala', 'error');
+        return;
+      }
+      
+      // Actualizar estado del juego
+      gameState.updatePlayers(data.players);
+      
+      // Verificar si el jugador actual es el creador
+      const currentPlayer = data.players.find(p => p.name === gameState.username);
+      const isCreator = currentPlayer ? currentPlayer.isCreator : false;
+      gameState.setHost(isCreator);
+      
+      console.log(`Jugador actual: ${gameState.username}, Es creador: ${isCreator}`);
+      
+      // Si ya se inició el juego, actualizar interfaz
+      if (data.isPlaying && data.currentLetter) {
+        gameState.startGame();
+        gameState.setCurrentLetter(data.currentLetter);
+        // El tiempo solo se actualiza con TIMER_UPDATE del servidor
+      } else if (isCreator && !data.isPlaying) {
+        // Mostrar botón de iniciar juego si es el creador y el juego no ha empezado
+        const startButton = document.getElementById('startGameButton');
+        if (startButton) {
+          startButton.style.display = 'block';
+        }
+        uiManager.announce('Eres el anfitrión. Puedes iniciar el juego cuando estés listo.');
+      }
+      
+      uiManager.announce(`Estado del juego cargado. ${data.players.length} jugadores en la sala.`);
+      showNotification('¡Listo para jugar!', 'success');
+    }
+
+    function handleJoinedRoom(data) {
+      console.log('Unido a la sala:', data);
+      
+      gameState.updatePlayers(data.players || []);
+      const isCreator = data.isCreator || false;
+      gameState.setHost(isCreator);
+      
+      console.log(`Unido a sala - Es creador: ${isCreator}`);
+      
+      // Si es el creador, mostrar controles apropiados
+      if (isCreator) {
+        const startButton = document.getElementById('startGameButton');
+        if (startButton) {
+          startButton.style.display = 'block';
+        }
+        uiManager.announce('Eres el anfitrión de esta sala.');
+      }
+      
+      uiManager.announce(`Te has unido a la sala. Hay ${data.players?.length || 0} jugadores.`);
+    }
+
+    function handlePlayerJoined(data) {
+      console.log('Jugador se unió:', data);
+      
+      if (data.players) {
+        gameState.updatePlayers(data.players);
+        
+        const playerName = data.player?.name;
+        if (playerName && playerName !== gameState.username) {
+          uiManager.announce(`${playerName} se unió al juego`);
+          showNotification(`${playerName} se unió al juego`, 'info');
+        }
+      }
+    }
+
+    function handlePlayerLeft(data) {
+      console.log('Jugador se fue:', data);
+      
+      if (data.players) {
+        gameState.updatePlayers(data.players);
+        
+        if (data.playerName && data.playerName !== gameState.username) {
+          uiManager.announce(`${data.playerName} dejó el juego`);
+          showNotification(`${data.playerName} dejó el juego`, 'info');
+        }
+      }
+    }
+
+    function handleShowRoulette(data) {
+      console.log('Mostrando ruleta:', data);
+      
+      gameState.startGame();
+      uiManager.showRoulette();
+      
+      // Actualizar interfaz según el rol
+      if (gameState.isHost) {
+        spinWheelButton.style.display = 'block';
+        document.getElementById('selectedLetter').textContent = '¡Haz clic en "Girar Ruleta" para comenzar!';
+      } else {
+        document.getElementById('selectedLetter').textContent = 'Esperando que el anfitrión gire la ruleta...';
+      }
+      
+      startGameButton.style.display = 'none';
+      uiManager.announce('El juego ha comenzado. Esperando que se gire la ruleta.');
+    }
+
+    function handleRouletteSpinning() {
+      console.log('La ruleta está girando...');
+      
+      // Deshabilitar botón de girar
+      if (spinWheelButton) {
+        spinWheelButton.disabled = true;
+        spinWheelButton.innerHTML = '<span class="spinner"></span> Girando...';
+      }
+      
+      // Mostrar animación
+      uiManager.animateRouletteSpinning();
+      
+      document.getElementById('selectedLetter').textContent = '🎰 La ruleta está girando...';
+      uiManager.announce('La ruleta está girando...');
+    }
+
+    function handleRouletteResult(data) {
+      console.log('Resultado de la ruleta:', data);
+      
+      gameState.setCurrentLetter(data.letter);
+      
+      // Ocultar ruleta y mostrar letra
+      uiManager.hideRoulette();
+      uiManager.displaySelectedLetter(data.letter);
+      
+      // Ocultar botón de girar
+      spinWheelButton.style.display = 'none';
+      
+      // Sincronización: el temporizador se renderiza solo con TIMER_UPDATE
+      
+      // Enfocar primer input
+      const firstInput = document.querySelector('#input-NOMBRE');
+      if (firstInput && !firstInput.disabled) {
+        firstInput.focus();
+      }
+    }
+
+    function handleTimerUpdate(data) {
+      gameState.timeRemaining = data.timeRemaining;
+      gameState.updateTimerDisplay();
+      
+      // Advertencia cuando queden pocos segundos
+      if (data.timeRemaining <= 10 && data.timeRemaining > 0) {
+        if (data.timeRemaining <= 5) {
+          uiManager.announce(`¡${data.timeRemaining} segundos!`);
+        }
+      }
+      if (data.timeRemaining <= 0) {
+        // Evitar acciones locales; el servidor cerrará la ronda
+        gameState.clearTimer();
+      }
+    }
+
+    function handleRoundEnded(data) {
+      console.log('Ronda terminada:', data);
+      
+      gameState.clearTimer();
+      gameState.disableInputs();
+      gameState.updatePlayerScore(data.scores);
+      
+      // Mostrar resultados
+      uiManager.showRoundResults(data);
+      
+      // Limpiar campos para la siguiente ronda
+      clearWordInputs();
+      
+      uiManager.announce('La ronda ha terminado. Revisa los resultados.');
+      
+      // Preparar para la siguiente ronda
+      setTimeout(() => {
+        if (gameState.isHost) {
+          spinWheelButton.style.display = 'block';
+          document.getElementById('selectedLetter').textContent = '¡Listo para la siguiente ronda! Gira la ruleta.';
+        } else {
+          document.getElementById('selectedLetter').textContent = 'Esperando la siguiente ronda...';
+        }
+        
+        uiManager.showRoulette();
+      }, 5000);
+    }
+
+    function handleGameEnded(data) {
+      console.log('Juego terminado:', data);
+      
+      gameState.clearTimer();
+      gameState.gameStarted = false;
+      
+      // Mostrar resultados finales
+      showGameResults(data.results);
+      
+      uiManager.announce('El juego ha terminado. Revisa los resultados finales.');
+    }
+
+    function moveToNextCategory(currentIndex) {
+      const wordInputs = document.querySelectorAll('.word-input');
+      const nextIndex = (currentIndex + 1) % wordInputs.length;
+      
+      if (nextIndex < wordInputs.length && !wordInputs[nextIndex].disabled) {
+        wordInputs[nextIndex].focus();
+      }
+    }
+
+    function checkAllWordsCompleted() {
+      const wordInputs = document.querySelectorAll('.word-input');
+      const allCompleted = Array.from(wordInputs).every(input => 
+        input.disabled || input.value.trim().length > 0
+      );
+      
+      // Habilitar botón si al menos una palabra está completa
+      const anyCompleted = Array.from(wordInputs).some(input => 
+        !input.disabled && input.value.trim().length > 0
+      );
+      
+      if (submitWordButton) {
+        submitWordButton.disabled = !anyCompleted;
+      }
+    }
+
+    function submitWordsClassic() {
+      const words = {};
+      let hasValidWords = false;
+      
+      // Recopilar palabras por categoría
+      GAME_CONFIG.CATEGORIES.forEach(category => {
+        const input = document.querySelector(`#input-${category}`);
+        if (input) {
+          const word = input.value.trim();
+          words[category] = word;
+          
+          if (word) {
+            hasValidWords = true;
+            
+            // Validar que comience con la letra correcta
+            if (gameState.currentLetter && !validateWord(word, gameState.currentLetter)) {
+              showNotification(
+                `La palabra "${word}" debe comenzar con la letra "${gameState.currentLetter}" para la categoría "${category}"`,
+                'error'
+              );
+              input.focus();
+              return;
+            }
+          }
+        }
+      });
+      
+      if (!hasValidWords) {
+        showNotification('Debes ingresar al menos una palabra', 'warning');
+        return;
+      }
+      
+      // Enviar las palabras al servidor
+      socketManager.submitWords(gameState.roomId, gameState.username, words);
+      
+      // Deshabilitar campos y botón
+      gameState.disableInputs();
+      
+      // Mostrar mensaje de confirmación
+      document.getElementById('selectedLetter').textContent = 'Palabras enviadas. Esperando a los demás jugadores...';
+      uiManager.announce('Palabras enviadas correctamente');
+      showNotification('¡Palabras enviadas!', 'success');
+    }
+
+    function clearWordInputs() {
+      const wordInputs = document.querySelectorAll('.word-input');
+      wordInputs.forEach(input => {
+        input.value = '';
+      });
+      
+      // Limpiar displays
+      GAME_CONFIG.CATEGORIES.forEach(category => {
+        const submittedSpan = document.getElementById(`submitted-${category}`);
+        const displayDiv = document.getElementById(`display-${category}`);
+        
+        if (submittedSpan) {
+          submittedSpan.textContent = '';
+        }
+        
+        if (displayDiv) {
+          displayDiv.classList.remove('valid', 'invalid', 'empty');
+          displayDiv.classList.add('empty');
+        }
+      });
+    }
+
+    function showGameResults(results) {
+      // Crear modal de resultados finales
+      const modal = uiManager.createModal('gameResults', 'Resultados Finales');
+      
+      let resultsHTML = '<h3>🏆 Clasificación Final</h3>';
+      
+      // Ordenar por puntuación
+      const sortedResults = results.sort((a, b) => b.score - a.score);
+      
+      resultsHTML += '<div class="final-scores">';
+      sortedResults.forEach((player, index) => {
+        const position = index + 1;
+        const emoji = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '🏅';
+        
+        resultsHTML += `
+          <div class="final-score-item ${position === 1 ? 'winner' : ''}">
+            <span class="position">${emoji} ${position}°</span>
+            <span class="player-name">${player.name}</span>
+            <span class="final-score">${player.score} puntos</span>
+          </div>
+        `;
+      });
+      resultsHTML += '</div>';
+      
+      // Botones de acción
+      resultsHTML += `
+        <div class="game-end-actions">
+          <button type="button" class="btn btn--primary" onclick="location.reload()">
+            🔄 Jugar de nuevo
+          </button>
+          <button type="button" class="btn btn--secondary" onclick="location.href='${ROUTES.HOME}'">
+            🏠 Volver al inicio
+          </button>
+        </div>
+      `;
+      
+      modal.querySelector('.modal__body').innerHTML = resultsHTML;
+      uiManager.openModal('gameResults');
+      
+      // Agregar estilos específicos
+      const style = document.createElement('style');
+      style.textContent = `
+        .final-scores {
+          display: grid;
+          gap: var(--space-3);
+          margin: var(--space-6) 0;
+        }
+        
+        .final-score-item {
+          display: flex;
+          align-items: center;
+          gap: var(--space-3);
+          padding: var(--space-4);
+          background: var(--color-gray-50);
+          border-radius: var(--radius-lg);
+          border: 2px solid var(--color-gray-200);
+        }
+        
+        .final-score-item.winner {
+          background: linear-gradient(135deg, #ffd700, #ffed4e);
+          border-color: #ffd700;
+          font-weight: var(--font-weight-semibold);
+        }
+        
+        .position {
+          font-size: var(--text-lg);
+          min-width: 60px;
+        }
+        
+        .player-name {
+          flex: 1;
+          font-weight: var(--font-weight-medium);
+        }
+        
+        .final-score {
+          font-weight: var(--font-weight-bold);
+          color: var(--color-primary);
+        }
+        
+        .game-end-actions {
+          display: flex;
+          gap: var(--space-3);
+          justify-content: center;
+          margin-top: var(--space-6);
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Limpieza al salir de la página
+    window.addEventListener('beforeunload', () => {
+      gameState.clearTimer();
+      socketManager.disconnect();
+    });
+  </script>
+</body>
+</html>
