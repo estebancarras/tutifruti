@@ -478,7 +478,14 @@
       socketManager.on(SOCKET_EVENTS.JOINED_ROOM, handleJoinedRoom);
       socketManager.on(SOCKET_EVENTS.PLAYER_JOINED, handlePlayerJoined);
       socketManager.on(SOCKET_EVENTS.PLAYER_LEFT, handlePlayerLeft);
+      // Escuchar tanto el evento legacy como el nuevo para compatibilidad
       socketManager.on(SOCKET_EVENTS.SHOW_ROULETTE, () => {
+        if (roomData.roomId) {
+          window.location.href = `${ROUTES.GAME}?roomId=${roomData.roomId}`;
+        }
+      });
+      
+      socketManager.on(SOCKET_EVENTS.ROUND_START, () => {
         if (roomData.roomId) {
           window.location.href = `${ROUTES.GAME}?roomId=${roomData.roomId}`;
         }

@@ -455,6 +455,163 @@ class UIManager {
   removeActiveInput(input) {
     input.classList.remove('current-input');
   }
+
+  /**
+   * Renderiza la grilla de categorías e inputs dinámicamente
+   * @param {string[]} categories
+   */
+  renderCategoriesGrid(categories = []) {
+    const grid = document.getElementById('categoriesGrid');
+    if (!grid) return;
+
+    grid.innerHTML = '';
+    categories.forEach((cat) => {
+      const safeId = `input-${cat}`;
+      const card = document.createElement('div');
+      card.className = 'category-card';
+
+      card.innerHTML = `
+        <div class="category-card__title">${cat}</div>
+        <div class="category-card__body">
+          <label for="${safeId}" class="sr-only">Ingresa ${cat.toLowerCase()}</label>
+          <input type="text"
+                 id="${safeId}"
+                 class="word-input"
+                 data-category="${cat}"
+                 placeholder="Con la letra actual..."
+                 autocomplete="off"
+                 maxlength="50" />
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  /**
+   * Abre el modal de revisión/votación con la lista de palabras por categoría y jugador
+   * @param {{round:number, letter:string, categories:string[], words:Object, reviewTime:number}} data
+   * @param {{isHost:boolean}} options
+   */
+  openReviewModal(data, options = { isHost: false }) {
+    const { categories = [], words = {}, letter = '', reviewTime = 20 } = data || {};
+    const isHost = !!options.isHost;
+
+    const modal = this.createModal('review', `Revisión de palabras (Letra: ${letter})`);
+    const body = modal.querySelector('.modal__body');
+
+    // Construir contenido agrupado por categoría
+    let html = `<div class="review-header">
+                  <div class="review-timer" id="reviewTimer" aria-live="polite">${reviewTime}s</div>
+                  <p class="review-help">Vota ✅/❌ para validar o impugnar las palabras (no puedes votar tu propia palabra).</p>
+                </div>`;
+
+    categories.forEach((cat) => {
+      html += `<section class="review-category">
+                 <h3 class="review-category__title">${cat} con "${letter}"</h3>
+                 <div class="review-category__list">`;
+
+      // Recorrer jugadores y su palabra en esta categoría
+      Object.keys(words || {}).forEach((playerName) => {
+        const w = (words[playerName] && words[playerName][cat]) || '';
+        const disabled = (localStorage.getItem('username') || '').toLowerCase() === playerName.toLowerCase();
+        const itemId = `vote-${cat}-${playerName}`.replace(/\s+/g, '-');
+
+        html += `
+          <div class="review-item" id="${itemId}">
+            <div class="review-item__player">
+              <span class="avatar" aria-hidden="true">${playerName.charAt(0).toUpperCase()}</span>
+              <span class="player-name">${playerName}</span>
+            </div>
+            <div class="review-item__word">${w || '<span class="muted">—</span>'}</div>
+            <div class="review-item__actions">
+              <button type="button" class="btn btn--ghost btn--sm vote-valid" data-cat="${cat}" data-player="${playerName}" ${disabled ? 'disabled' : ''} title="Marcar válida">✅</button>
+              <button type="button" class="btn btn--ghost btn--sm vote-invalid" data-cat="${cat}" data-player="${playerName}" ${disabled ? 'disabled' : ''} title="Marcar inválida">❌</button>
+              <span class="vote-counts" aria-live="polite">
+                <span class="vote-valid-count">0</span>/<span class="vote-invalid-count">0</span>
+              </span>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `  </div>
+               </section>`;
+    });
+
+    // Botón “Siguiente Ronda” solo para host
+    if (isHost) {
+      html += `
+        <div class="review-actions">
+          <button type="button" id="nextRoundButton" class="btn btn--primary">
+            Siguiente Ronda
+          </button>
+        </div>
+      `;
+    }
+
+    body.innerHTML = html;
+    this.openModal('review');
+
+    // Wire de votos
+    body.querySelectorAll('.vote-valid').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cat = btn.getAttribute('data-cat');
+        const player = btn.getAttribute('data-player');
+        const voterName = localStorage.getItem('username') || '';
+        window.socketManager?.castVote({ roomId: localStorage.getItem('currentRoomId'), voterName, targetPlayer: player, category: cat, decision: 'valid' });
+      });
+    });
+    body.querySelectorAll('.vote-invalid').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cat = btn.getAttribute('data-cat');
+        const player = btn.getAttribute('data-player');
+        const voterName = localStorage.getItem('username') || '';
+        window.socketManager?.castVote({ roomId: localStorage.getItem('currentRoomId'), voterName, targetPlayer: player, category: cat, decision: 'invalid' });
+      });
+    });
+
+    // Wire “Siguiente Ronda”
+    const nextBtn = body.querySelector('#nextRoundButton');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        const roomId = localStorage.getItem('currentRoomId');
+        window.socketManager?.nextRound(roomId);
+      });
+    }
+
+    // Contador visual (solo UI; el servidor cierra igualmente)
+    let remaining = reviewTime;
+    const timerEl = body.querySelector('#reviewTimer');
+    if (timerEl) {
+      const interval = setInterval(() => {
+        remaining = Math.max(0, remaining - 1);
+        timerEl.textContent = `${remaining}s`;
+        if (remaining <= 0) clearInterval(interval);
+      }, 1000);
+    }
+  }
+
+  /**
+   * Actualiza contadores de votos de un ítem
+   * @param {{targetPlayer:string, category:string, validCount:number, invalidCount:number}} data
+   */
+  updateVoteCounts(data) {
+    const { targetPlayer, category, validCount = 0, invalidCount = 0 } = data || {};
+    const id = `vote-${category}-${targetPlayer}`.replace(/\s+/g, '-');
+    const root = document.getElementById(id);
+    if (!root) return;
+    const vc = root.querySelector('.vote-valid-count');
+    const ic = root.querySelector('.vote-invalid-count');
+    if (vc) vc.textContent = String(validCount);
+    if (ic) ic.textContent = String(invalidCount);
+  }
+
+  /**
+   * Cierra el modal de revisión (si está abierto)
+   */
+  closeReviewModal() {
+    this.closeModal('review');
+  }
 }
 
 // Exportar instancia singleton

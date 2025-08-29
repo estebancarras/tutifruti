@@ -47,6 +47,7 @@ let gameStates = {};
 // Mapa de timers de desconexión con período de gracia por jugador
 const disconnectTimers = new Map(); // key: `${roomId}:${playerName}` -> timeout id
 const GRACE_PERIOD_MS = 15000;
+const REVIEW_TIME_MS = 20000; // Duración de la fase de revisión/votación
 
 // Helpers de conteo de conectados y actualización de sala
 function getConnectedPlayers(gameState) {
@@ -127,19 +128,28 @@ const createGameState = (roomId, maxPlayers = 5) => {
     isPlaying: false,
     currentRound: 0,
     currentLetter: '',
-    categories: ['NOMBRE', 'ANIMAL', 'COSA', 'FRUTA'], // Formato clásico
+    // Categorías ampliadas (10) – se pueden hacer configurables por sala en el futuro
+    categories: ['NOMBRE', 'ANIMAL', 'COSA', 'FRUTA', 'PAIS', 'COLOR', 'COMIDA', 'CIUDAD', 'PROFESION', 'MARCA'],
     gameMode: 'classic', // Modo de juego clásico
     timeLimit: 60,
     timeRemaining: 60,
     timer: null,
+    timerEndsAt: null,
     scores: {},
-    words: {}, // Estructura: {playerName: {NOMBRE: 'palabra', ANIMAL: 'palabra', ...}}
+    // Estructura: {playerName: {CATEGORIA: 'palabra', ...}}
+    words: {},
     validWords: {},
+    // Orquestación de fases
+    roundPhase: 'lobby', // lobby | roundStart | writing | review | results | ended
+    reviewDuration: Math.floor(REVIEW_TIME_MS / 1000),
+    reviewEndsAt: null,
+    votes: {}, // { [playerName]: { [category]: { valid: Set|[], invalid: Set|[] } } }
     creator: null,
     private: false,
     password: null,
+    // Props legacy para compatibilidad con UI anterior
     rouletteSpinning: false,
-    showRoulette: true
+    showRoulette: false
   };
 };
 
@@ -262,6 +272,7 @@ io.on('connection', (socket) => {
     gameStates[roomId].creator = playerName;
     gameStates[roomId].private = isPrivate;
     gameStates[roomId].password = password;
+    gameStates[roomId].maxRounds = Number(rounds) > 0 ? Number(rounds) : 5;
     // Configurar número de rondas (1..20)
     const parsedRounds = (typeof rounds === 'number' && isFinite(rounds)) ? Math.floor(rounds) : NaN;
     gameStates[roomId].maxRounds = (!isNaN(parsedRounds) ? Math.max(1, Math.min(20, parsedRounds)) : 5);
@@ -383,7 +394,7 @@ io.on('connection', (socket) => {
     logEvent({ socket, event: 'joinRoom', roomId, message: `${playerName} unido` });
   });
 
-  // Iniciar el juego - mostrar ruleta
+  // Iniciar el juego - flujo legacy: mostrar ruleta y esperar spinRoulette
   socket.on('startGame', () => {
     const roomId = socket.roomId;
     const gameState = gameStates[roomId];
@@ -396,64 +407,49 @@ io.on('connection', (socket) => {
       return socket.emit('error', { message: 'Solo el creador puede iniciar el juego' });
     }
     
-    // Iniciar el juego - mostrar ruleta
+    // Iniciar juego mostrando ruleta (sin seleccionar letra aún)
     gameState.isPlaying = true;
     gameState.currentRound = 1;
+    gameState.roundPhase = 'roundStart';
     gameState.showRoulette = true;
-    
-    // Notificar a todos los jugadores que se muestre la ruleta
-    io.to(roomId).emit('showRoulette', {
-      round: gameState.currentRound
-    });
-    
+
+    io.to(roomId).emit('showRoulette');
     logEvent({ socket, event: 'startGame', roomId, message: 'Juego iniciado - mostrar ruleta' });
   });
 
-  // Girar la ruleta
+  // Girar la ruleta (legacy): compatibilidad, inicia una nueva letra si es host
   socket.on('spinRoulette', () => {
     const roomId = socket.roomId;
     const gameState = gameStates[roomId];
-    
     if (!gameState || !gameState.isPlaying) return;
-    
-    // Verificar si el que gira es el creador
     const player = gameState.players.find(p => p.id === socket.id);
     if (!player || !player.isCreator) {
-      return socket.emit('error', { message: 'Solo el creador puede girar la ruleta' });
+      return socket.emit('error', { message: 'Solo el creador puede iniciar la ronda' });
     }
+    // Si ya estamos escribiendo, ignorar
+    if (gameState.roundPhase === 'writing') return;
     
-    if (gameState.rouletteSpinning) {
-      return socket.emit('error', { message: 'La ruleta ya está girando' });
-    }
+    gameState.roundPhase = 'roundStart';
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
     
-    // Marcar ruleta como girando
-    gameState.rouletteSpinning = true;
+    io.to(roomId).emit('roundStart', {
+      letter: gameState.currentLetter,
+      timeLimit: gameState.timeLimit,
+      round: gameState.currentRound,
+      categories: gameState.categories
+    });
     
-    // Notificar que la ruleta está girando
-    io.to(roomId).emit('rouletteSpinning');
+    // Compatibilidad legacy
+    io.to(roomId).emit('rouletteResult', {
+      letter: gameState.currentLetter,
+      timeLimit: gameState.timeLimit,
+      round: gameState.currentRound
+    });
     
-    // Simular tiempo de giro (3 segundos)
-    setTimeout(() => {
-      // Seleccionar letra aleatoria
-      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
-      gameState.rouletteSpinning = false;
-      gameState.showRoulette = false;
-      
-      // Notificar resultado de la ruleta
-      io.to(roomId).emit('rouletteResult', {
-        letter: gameState.currentLetter,
-        timeLimit: gameState.timeLimit,
-        round: gameState.currentRound
-      });
-      
-      // Iniciar temporizador después de mostrar la letra
-      setTimeout(() => {
-        startTimer(roomId);
-      }, 2000);
-      
-      logEvent({ socket, event: 'spinRoulette', roomId, message: `Letra ${gameState.currentLetter}` });
-    }, 3000);
+    gameState.roundPhase = 'writing';
+    setTimeout(() => startTimer(roomId), 500);
+    logEvent({ socket, event: 'spinRoulette', roomId, message: `Inicio de ronda con letra ${gameState.currentLetter}` });
   });
 
   // Enviar todas las palabras de la tabla - FORMATO CLÁSICO
@@ -517,46 +513,38 @@ io.on('connection', (socket) => {
         gameState.timer = null;
       }
       
-      // Calcular puntuaciones con el sistema clásico (único flujo)
+      // Calcular puntuaciones usando el sistema clásico (flujo legacy directo)
       const scores = calculateClassicScores(gameState);
       
-      // Actualizar puntuaciones en el estado del juego
+      // Actualizar puntuaciones acumuladas
       Object.keys(scores).forEach(player => {
-        const playerIndex = gameState.players.findIndex(p => p.name === player);
-        if (playerIndex !== -1) {
-          gameState.players[playerIndex].score += scores[player].total;
+        const idx = gameState.players.findIndex(p => p.name === player);
+        if (idx !== -1) {
+          gameState.players[idx].score += scores[player].total;
         }
       });
       
-      // Notificar a todos los jugadores
+      // Notificar fin de ronda
       io.to(roomId).emit('roundEnded', {
-        scores: scores,
+        scores,
         words: gameState.words,
         validWords: gameState.validWords,
         playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
         letter: gameState.currentLetter
       });
       
-      // Reiniciar para la siguiente ronda
-      gameState.words = {};
-      gameState.validWords = {};
-      gameState.currentRound++;
-      gameState.timeRemaining = gameState.timeLimit;
-      gameState.showRoulette = true; // Mostrar ruleta para la siguiente ronda
-
-      // Decidir siguiente paso: nueva ronda o fin de juego
-      if (gameState.currentRound > (gameState.maxRounds || 5)) {
-        const finalResults = gameState.players.map(p => ({ name: p.name, score: p.score }));
-        io.to(roomId).emit('gameEnded', { results: finalResults });
-        gameState.isPlaying = false;
-        gameState.showRoulette = false;
+      // ¿Fin de juego o siguiente ronda?
+      const isLastRound = (gameState.maxRounds && gameState.currentRound >= gameState.maxRounds);
+      if (isLastRound) {
+        endGame(roomId);
       } else {
-        setTimeout(() => {
-          // Mostrar ruleta para la siguiente ronda
-          io.to(roomId).emit('showRoulette', {
-            round: gameState.currentRound
-          });
-        }, 2500);
+        // Preparar siguiente ronda
+        gameState.words = {};
+        gameState.validWords = {};
+        gameState.currentRound++;
+        gameState.timeRemaining = gameState.timeLimit;
+        gameState.showRoulette = true;
+        // El frontend legacy mostrará la ruleta al próximo startGame/spinRoulette
       }
     }
     
@@ -603,6 +591,147 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Votación durante la fase de revisión
+  socket.on('castVote', ({ roomId, voterName, targetPlayer, category, decision }) => {
+    const gameState = gameStates[roomId];
+    if (!gameState || gameState.roundPhase !== 'review') return;
+    const voter = (voterName || socket.playerName || '').trim();
+    const target = (targetPlayer || '').trim();
+    const cat = (category || '').trim();
+    const dec = decision === 'invalid' ? 'invalid' : 'valid';
+    
+    if (!voter || !target || !cat) return;
+    if (voter.toLowerCase() === target.toLowerCase()) return; // No auto-voto
+    
+    if (!gameState.votes[target]) gameState.votes[target] = {};
+    if (!gameState.votes[target][cat]) gameState.votes[target][cat] = { valid: new Set(), invalid: new Set() };
+    
+    // Quitar de ambos y agregar al elegido
+    gameState.votes[target][cat].valid.delete(voter);
+    gameState.votes[target][cat].invalid.delete(voter);
+    gameState.votes[target][cat][dec].add(voter);
+    
+    // Broadcast liviano (sin revelar votos detallados si no se desea)
+    io.to(roomId).emit('voteUpdate', {
+      targetPlayer,
+      category,
+      validCount: gameState.votes[target][cat].valid.size,
+      invalidCount: gameState.votes[target][cat].invalid.size
+    });
+    
+    logEvent({ socket, event: 'castVote', roomId, message: `Voto ${dec} de ${voter} sobre ${target}/${cat}` });
+  });
+  
+  // Avanzar a la siguiente ronda (host) tras revisión
+  socket.on('nextRound', ({ roomId, resolutions = {} }) => {
+    const gameState = gameStates[roomId];
+    if (!gameState || !gameState.isPlaying) return;
+    
+    // Solo el host puede avanzar
+    const player = gameState.players.find(p => p.id === socket.id);
+    if (!player || !player.isCreator) {
+      return socket.emit('error', { message: 'Solo el anfitrión puede avanzar a la siguiente ronda' });
+    }
+    
+    // Consolidar validez por votos (mayoría simple; en empate, usar resoluciones del host si existen; si no, válida por defecto)
+    const finalValid = {};
+    const categories = gameState.categories || [];
+    
+    Object.keys(gameState.words || {}).forEach(playerName => {
+      finalValid[playerName] = finalValid[playerName] || {};
+      categories.forEach(cat => {
+        const word = (gameState.words[playerName] && gameState.words[playerName][cat]) || '';
+        if (!word) { finalValid[playerName][cat] = false; return; }
+        
+        // Primero: si no empieza por la letra, inválida
+        const isLetterValid = word.charAt(0).toUpperCase() === gameState.currentLetter;
+        if (!isLetterValid) { finalValid[playerName][cat] = false; return; }
+        
+        const voteBucket = (gameState.votes[playerName] && gameState.votes[playerName][cat]) || { valid: new Set(), invalid: new Set() };
+        // Convertir a números (si vinieran serializados previamente)
+        const validCount = (voteBucket.valid instanceof Set) ? voteBucket.valid.size : Array.isArray(voteBucket.valid) ? voteBucket.valid.length : 0;
+        const invalidCount = (voteBucket.invalid instanceof Set) ? voteBucket.invalid.size : Array.isArray(voteBucket.invalid) ? voteBucket.invalid.length : 0;
+        
+        if (validCount > invalidCount) {
+          finalValid[playerName][cat] = true;
+        } else if (invalidCount > validCount) {
+          finalValid[playerName][cat] = false;
+        } else {
+          // Empate: usar resolución del host si se proporcionó; de lo contrario, válida por defecto
+          const key = `${playerName}:${cat}`;
+          if (resolutions && Object.prototype.hasOwnProperty.call(resolutions, key)) {
+            finalValid[playerName][cat] = !!resolutions[key];
+          } else {
+            finalValid[playerName][cat] = true;
+          }
+        }
+      });
+    });
+    
+    // Persistir validez final y emitir evento de cierre de revisión
+    gameState.validWords = finalValid;
+    io.to(roomId).emit('reviewEnded', {
+      round: gameState.currentRound,
+      letter: gameState.currentLetter,
+      validWords: finalValid
+    });
+    
+    // Calcular puntuaciones con validez final
+    const scores = calculateClassicScores(gameState);
+    Object.keys(scores).forEach(name => {
+      const idx = gameState.players.findIndex(p => p.name === name);
+      if (idx !== -1) gameState.players[idx].score += scores[name].total;
+    });
+    
+    // Notificar fin de ronda (resultados)
+    io.to(roomId).emit('roundEnded', {
+      scores,
+      words: gameState.words,
+      validWords: gameState.validWords,
+      playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
+      letter: gameState.currentLetter
+    });
+    
+    // Preparar siguiente ronda o finalizar
+    gameState.words = {};
+    gameState.votes = {};
+    gameState.roundPhase = 'results';
+    gameState.currentRound++;
+    gameState.timeRemaining = gameState.timeLimit;
+    gameState.timerEndsAt = null;
+    
+    if (gameState.currentRound > (gameState.maxRounds || 5)) {
+      gameState.isPlaying = false;
+      gameState.roundPhase = 'ended';
+      io.to(roomId).emit('gameEnded', {
+        results: gameState.players.map(p => ({ name: p.name, score: p.score }))
+      });
+      return;
+    }
+    
+    // Iniciar siguiente ronda automáticamente con nueva letra
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+    gameState.roundPhase = 'roundStart';
+    
+    io.to(roomId).emit('roundStart', {
+      letter: gameState.currentLetter,
+      timeLimit: gameState.timeLimit,
+      round: gameState.currentRound,
+      categories: gameState.categories
+    });
+    
+    // Compatibilidad legacy
+    io.to(roomId).emit('rouletteResult', {
+      letter: gameState.currentLetter,
+      timeLimit: gameState.timeLimit,
+      round: gameState.currentRound
+    });
+    
+    gameState.roundPhase = 'writing';
+    setTimeout(() => startTimer(roomId), 500);
+  });
+  
   // Manejar desconexión
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
@@ -696,6 +825,19 @@ io.on('connection', (socket) => {
   });
 });
 
+ // Función para finalizar el juego y emitir resultados
+function endGame(roomId) {
+  const gameState = gameStates[roomId];
+  if (!gameState) return;
+  gameState.isPlaying = false;
+  if (gameState.timer) {
+    clearInterval(gameState.timer);
+    gameState.timer = null;
+  }
+  const results = (gameState.players || []).map(p => ({ name: p.name, score: p.score || 0 }));
+  io.to(roomId).emit('gameEnded', { results });
+}
+
 // Función para iniciar el temporizador
 function startTimer(roomId) {
   const gameState = gameStates[roomId];
@@ -725,45 +867,39 @@ function startTimer(roomId) {
       clearInterval(gameState.timer);
       gameState.timer = null;
       
-      // Calcular puntuaciones usando el sistema clásico (unificado)
-      const scores = calculateClassicScores(gameState);
-      
-      // Actualizar puntuaciones en el estado del juego
-      Object.keys(scores).forEach(player => {
-        const playerIndex = gameState.players.findIndex(p => p.name === player);
-        if (playerIndex !== -1) {
-          gameState.players[playerIndex].score += scores[player].total;
+      // Fin del tiempo: puntuar directamente (flujo legacy)
+      if (gameState.isPlaying) {
+        const scores = calculateClassicScores(gameState);
+        Object.keys(scores).forEach(player => {
+          const idx = gameState.players.findIndex(p => p.name === player);
+          if (idx !== -1) {
+            gameState.players[idx].score += scores[player].total;
+          }
+        });
+        
+        io.to(roomId).emit('roundEnded', {
+          scores,
+          words: gameState.words,
+          validWords: gameState.validWords,
+          playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
+          letter: gameState.currentLetter
+        });
+        
+        // ¿Fin de juego o siguiente ronda?
+        const isLastRound = (gameState.maxRounds && gameState.currentRound >= gameState.maxRounds);
+        if (isLastRound) {
+          endGame(roomId);
+          gameState.timerEndsAt = null;
+        } else {
+          gameState.words = {};
+          gameState.validWords = {};
+          gameState.currentRound++;
+          gameState.timeRemaining = gameState.timeLimit;
+          gameState.timerEndsAt = null;
+          gameState.showRoulette = true;
         }
-      });
-      
-      // Notificar fin de ronda
-      io.to(roomId).emit('roundEnded', {
-        scores: scores,
-        words: gameState.words,
-        validWords: gameState.validWords,
-        playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
-        letter: gameState.currentLetter
-      });
-      
-      // Reiniciar para la siguiente ronda
-      gameState.words = {};
-      gameState.validWords = {};
-      gameState.currentRound++;
-      gameState.timeRemaining = gameState.timeLimit;
-      gameState.timerEndsAt = null;
-
-      // Decidir siguiente paso: nueva ronda o fin de juego
-      if (gameState.currentRound > (gameState.maxRounds || 5)) {
-        const finalResults = gameState.players.map(p => ({ name: p.name, score: p.score }));
-        io.to(roomId).emit('gameEnded', { results: finalResults });
-        gameState.isPlaying = false;
-        gameState.showRoulette = false;
       } else {
-        setTimeout(() => {
-          io.to(roomId).emit('showRoulette', {
-            round: gameState.currentRound
-          });
-        }, 2500);
+        gameState.timerEndsAt = null;
       }
     }
   }, 1000);

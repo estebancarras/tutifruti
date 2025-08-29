@@ -726,3 +726,144 @@
   transform: translate(-50%, -50%);
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
+
+/* ====== Nueva rejilla de categorías (flujo sin tabla) ====== */
+.categories-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+.category-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.95);
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+  box-shadow: var(--shadow);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal), border-color var(--transition-normal);
+}
+
+.category-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--color-gray-300);
+}
+
+.category-card__title {
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-2);
+  color: var(--color-gray-800);
+}
+
+.category-card__body .word-input {
+  margin-bottom: 0;
+}
+
+/* Estado completado de una categoría (cuando el input tiene valor) */
+.category-card.completed {
+  background: linear-gradient(135deg, rgba(46, 213, 115, 0.1), rgba(46, 213, 115, 0.05));
+  border-color: var(--color-success);
+}
+
+.category-card.completed::after {
+  content: '✅';
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-3);
+  font-size: var(--text-xl);
+}
+
+/* ====== Estilos del modal de revisión/votación ====== */
+.review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.review-timer {
+  font-weight: var(--font-weight-bold);
+  background: var(--color-gray-100);
+  border: 1px solid var(--color-gray-300);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+}
+
+.review-category {
+  margin-bottom: var(--space-5);
+}
+
+.review-category__title {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-gray-800);
+  margin-bottom: var(--space-3);
+}
+
+.review-category__list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.review-item {
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-gray-50);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-gray-200);
+}
+
+.review-item__player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.review-item .avatar {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-radius: 50%;
+  font-weight: var(--font-weight-bold);
+}
+
+.review-item__word {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-gray-800);
+}
+
+.review-item__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.review-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 768px) {
+  .categories-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .categories-grid {
+    grid-template-columns: 1fr;
+  }
+  .review-item {
+    grid-template-columns: 1fr;
+    gap: var(--space-2);
+  }
+}

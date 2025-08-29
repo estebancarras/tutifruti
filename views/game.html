@@ -59,106 +59,9 @@
              aria-label="Letra actual">?</div>
       </div>
 
-      <!-- Tabla de categorías -->
-      <div class="game-table-container">
-        <table class="game-table" role="table" aria-label="Tabla de categorías del juego">
-          <thead>
-            <tr class="table-header" role="row">
-              <th class="category-header" role="columnheader" scope="col">
-                <span class="category-icon" aria-hidden="true">👤</span>
-                <span class="category-title">NOMBRE</span>
-              </th>
-              <th class="category-header" role="columnheader" scope="col">
-                <span class="category-icon" aria-hidden="true">🐾</span>
-                <span class="category-title">ANIMAL</span>
-              </th>
-              <th class="category-header" role="columnheader" scope="col">
-                <span class="category-icon" aria-hidden="true">📦</span>
-                <span class="category-title">COSA</span>
-              </th>
-              <th class="category-header" role="columnheader" scope="col">
-                <span class="category-icon" aria-hidden="true">🍎</span>
-                <span class="category-title">FRUTA</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <!-- Fila de inputs -->
-            <tr class="input-row" role="row">
-              <td class="input-cell" data-category="NOMBRE" role="cell">
-                <label for="input-NOMBRE" class="sr-only">Ingresa un nombre</label>
-                <input type="text" 
-                       id="input-NOMBRE"
-                       class="word-input" 
-                       data-category="NOMBRE" 
-                       placeholder="Ej: Ana..." 
-                       disabled
-                       autocomplete="off"
-                       maxlength="50">
-              </td>
-              <td class="input-cell" data-category="ANIMAL" role="cell">
-                <label for="input-ANIMAL" class="sr-only">Ingresa un animal</label>
-                <input type="text" 
-                       id="input-ANIMAL"
-                       class="word-input" 
-                       data-category="ANIMAL" 
-                       placeholder="Ej: Águila..." 
-                       disabled
-                       autocomplete="off"
-                       maxlength="50">
-              </td>
-              <td class="input-cell" data-category="COSA" role="cell">
-                <label for="input-COSA" class="sr-only">Ingresa una cosa</label>
-                <input type="text" 
-                       id="input-COSA"
-                       class="word-input" 
-                       data-category="COSA" 
-                       placeholder="Ej: Auto..." 
-                       disabled
-                       autocomplete="off"
-                       maxlength="50">
-              </td>
-              <td class="input-cell" data-category="FRUTA" role="cell">
-                <label for="input-FRUTA" class="sr-only">Ingresa una fruta</label>
-                <input type="text" 
-                       id="input-FRUTA"
-                       class="word-input" 
-                       data-category="FRUTA" 
-                       placeholder="Ej: Manzana..." 
-                       disabled
-                       autocomplete="off"
-                       maxlength="50">
-              </td>
-            </tr>
-            <!-- Fila de visualización -->
-            <tr class="display-row" role="row">
-              <td class="display-cell" role="cell">
-                <div class="word-display" id="display-NOMBRE">
-                  <span class="word-text" id="submitted-NOMBRE"></span>
-                  <span class="word-status"></span>
-                </div>
-              </td>
-              <td class="display-cell" role="cell">
-                <div class="word-display" id="display-ANIMAL">
-                  <span class="word-text" id="submitted-ANIMAL"></span>
-                  <span class="word-status"></span>
-                </div>
-              </td>
-              <td class="display-cell" role="cell">
-                <div class="word-display" id="display-COSA">
-                  <span class="word-text" id="submitted-COSA"></span>
-                  <span class="word-status"></span>
-                </div>
-              </td>
-              <td class="display-cell" role="cell">
-                <div class="word-display" id="display-FRUTA">
-                  <span class="word-text" id="submitted-FRUTA"></span>
-                  <span class="word-status"></span>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Rejilla dinámica de categorías -->
+      <div class="categories-grid" id="categoriesGrid" role="group" aria-label="Categorías del juego">
+        <!-- Se renderiza dinámicamente con uiManager.renderCategoriesGrid -->
       </div>
     </section>
 
@@ -280,9 +183,10 @@
       
       // Conectar socket y configurar eventos
       socketManager.connect();
+      window.socketManager = socketManager;
       setupSocketListeners();
       setupEventListeners();
-      setupWordInputEvents();
+      attachWordInputEvents();
 
       // NO unirse nuevamente - ya estamos unidos desde la sala de espera
       // En su lugar, solicitar el estado actual de la sala
@@ -326,7 +230,7 @@
       submitWordButton?.addEventListener('click', submitWordsClassic);
     }
 
-    function setupWordInputEvents() {
+    function attachWordInputEvents() {
       const wordInputs = document.querySelectorAll('.word-input');
       
       wordInputs.forEach((input, index) => {
@@ -352,6 +256,16 @@
           
           // Actualizar visualización
           uiManager.updateWordDisplay(category, word, isValid);
+
+          // Marcar tarjeta completada si tiene contenido
+          const card = this.closest('.category-card');
+          if (card) {
+            if (word.length > 0) {
+              card.classList.add('completed');
+            } else {
+              card.classList.remove('completed');
+            }
+          }
           
           // Verificar si todas las palabras están completas
           checkAllWordsCompleted();
@@ -384,6 +298,13 @@
       socketManager.on(SOCKET_EVENTS.TIMER_UPDATE, handleTimerUpdate);
       socketManager.on(SOCKET_EVENTS.ROUND_ENDED, handleRoundEnded);
       socketManager.on(SOCKET_EVENTS.GAME_ENDED, handleGameEnded);
+
+      // Nuevos eventos (flujo sin ruleta)
+      socketManager.on(SOCKET_EVENTS.ROUND_START, handleRoundStart);
+      socketManager.on(SOCKET_EVENTS.START_REVIEW, handleStartReview);
+      socketManager.on(SOCKET_EVENTS.VOTE_UPDATE, handleVoteUpdate);
+      socketManager.on(SOCKET_EVENTS.REVIEW_ENDED, handleReviewEnded);
+
       // Alineación con eventos adicionales
       socketManager.on(SOCKET_EVENTS.YOU_ARE_CREATOR, () => {
         gameState.setHost(true);
@@ -422,7 +343,9 @@
       if (data.isPlaying) {
         gameState.startGame();
         if (data.currentLetter) {
-          // Juego en curso con letra definida: habilitar inputs
+          // Juego en curso con letra definida: renderizar categorías y habilitar inputs
+          uiManager.renderCategoriesGrid(data.categories || GAME_CONFIG.CATEGORIES);
+          attachWordInputEvents();
           gameState.setCurrentLetter(data.currentLetter);
         } else {
           // Juego en curso sin letra aún: mostrar ruleta y botón de girar
@@ -498,7 +421,7 @@
       }
     }
 
-    function handleShowRoulette(data) {
+function handleShowRoulette(data) {
       console.log('Mostrando ruleta:', data);
       
       gameState.startGame();
@@ -558,16 +481,66 @@
         uiManager.hideRoulette();
         uiManager.displaySelectedLetter(data.letter);
 
-        // Establecer estado y habilitar inputs (servidor es la fuente de verdad)
+        // Render dinámico de categorías y habilitar inputs (compatibilidad con flujo nuevo)
+        uiManager.renderCategoriesGrid(GAME_CONFIG.CATEGORIES);
+        attachWordInputEvents();
+        gameState.setCurrentLetter(data.letter);
+        gameState.enableInputs();
+      }, 1200);
+    }
+
+    // Nuevo flujo sin ruleta
+    function handleRoundStart(data) {
+      try {
+        const categories = data?.categories || GAME_CONFIG.CATEGORIES;
+        // Ocultar cualquier ruleta legacy
+        uiManager.hideRoulette();
+        // Render de categorías dinámicas
+        uiManager.renderCategoriesGrid(categories);
+        attachWordInputEvents();
+        // Mostrar letra y habilitar inputs
+        uiManager.displaySelectedLetter(data.letter);
         gameState.setCurrentLetter(data.letter);
         gameState.enableInputs();
 
-        // Enfocar primer input disponible por accesibilidad
-        const firstInput = document.querySelector('#input-NOMBRE');
-        if (firstInput && !firstInput.disabled) {
-          try { firstInput.focus(); } catch (_) {}
-        }
-      }, 1200);
+        // Enfocar primer input disponible
+        const first = document.querySelector('.word-input:not([disabled])');
+        if (first) { try { first.focus(); } catch(_) {} }
+
+        // Mensaje accesible
+        document.getElementById('selectedLetter').textContent = `Letra seleccionada: ${data.letter}. ¡A escribir!`;
+      } catch (e) {
+        console.error('Error en handleRoundStart:', e);
+      }
+    }
+
+    function handleStartReview(data) {
+      try {
+        // Bloquear entradas y botón de enviar
+        gameState.disableInputs();
+        if (submitWordButton) submitWordButton.disabled = true;
+        // Abrir modal de revisión
+        uiManager.openReviewModal(data, { isHost: !!gameState.isHost });
+      } catch (e) {
+        console.error('Error en handleStartReview:', e);
+      }
+    }
+
+    function handleVoteUpdate(data) {
+      try {
+        uiManager.updateVoteCounts(data);
+      } catch (e) {
+        console.error('Error en handleVoteUpdate:', e);
+      }
+    }
+
+    function handleReviewEnded(data) {
+      try {
+        // Cerrar modal de revisión; los resultados llegarán por ROUND_ENDED
+        uiManager.closeReviewModal();
+      } catch (e) {
+        console.error('Error en handleReviewEnded:', e);
+      }
     }
 
     function handleTimerUpdate(data) {
@@ -601,22 +574,11 @@
       
       uiManager.announce('La ronda ha terminado. Revisa los resultados.');
       
-      // Preparar para la siguiente ronda
-      setTimeout(() => {
-        if (spinWheelButton) {
-          spinWheelButton.style.display = 'block';
-          const isHost = !!gameState.isHost;
-          spinWheelButton.disabled = !isHost;
-          spinWheelButton.innerHTML = isHost
-            ? '<span aria-hidden="true">🎰</span> Girar Ruleta'
-            : '<span aria-hidden="true">⏳</span> Esperando al anfitrión';
-        }
-        document.getElementById('selectedLetter').textContent = gameState.isHost
-          ? '¡Listo para la siguiente ronda! Gira la ruleta.'
-          : 'Esperando la siguiente ronda...';
-        
-        uiManager.showRoulette();
-      }, 5000);
+      // Preparar para la siguiente ronda: esperar ROUND_START del servidor
+      const selectedLetterEl = document.getElementById('selectedLetter');
+      if (selectedLetterEl) {
+        selectedLetterEl.textContent = 'Esperando siguiente ronda...';
+      }
     }
 
     function handleGameEnded(data) {
@@ -659,30 +621,36 @@
     function submitWordsClassic() {
       const words = {};
       let hasValidWords = false;
-      
-      // Recopilar palabras por categoría
-      GAME_CONFIG.CATEGORIES.forEach(category => {
-        const input = document.querySelector(`#input-${category}`);
-        if (input) {
-          const word = input.value.trim();
-          words[category] = word;
-          
-          if (word) {
-            hasValidWords = true;
-            
-            // Validar que comience con la letra correcta
-            if (gameState.currentLetter && !validateWord(word, gameState.currentLetter)) {
-              showNotification(
-                `La palabra "${word}" debe comenzar con la letra "${gameState.currentLetter}" para la categoría "${category}"`,
-                'error'
-              );
-              input.focus();
-              return;
-            }
+      let hasInvalid = false;
+
+      // Recopilar palabras leyendo la grilla dinámica renderizada (no depender de constantes)
+      const inputs = document.querySelectorAll('.word-input');
+      inputs.forEach((input) => {
+        const category = input.getAttribute('data-category');
+        if (!category) return;
+
+        const word = (input.value || '').trim();
+        words[category] = word;
+
+        if (word) {
+          hasValidWords = true;
+
+          // Validar que comience con la letra correcta
+          if (gameState.currentLetter && !validateWord(word, gameState.currentLetter)) {
+            hasInvalid = true;
+            showNotification(
+              `La palabra "${word}" debe comenzar con la letra "${gameState.currentLetter}" para la categoría "${category}"`,
+              'error'
+            );
+            try { input.focus(); } catch (_) {}
           }
         }
       });
-      
+
+      if (hasInvalid) {
+        return; // Abortamos el envío si hay alguna entrada inválida
+      }
+
       if (!hasValidWords) {
         showNotification('Debes ingresar al menos una palabra', 'warning');
         return;
@@ -701,24 +669,18 @@
     }
 
     function clearWordInputs() {
+      // Limpiar inputs dinámicos
       const wordInputs = document.querySelectorAll('.word-input');
       wordInputs.forEach(input => {
         input.value = '';
       });
-      
-      // Limpiar displays
-      GAME_CONFIG.CATEGORIES.forEach(category => {
-        const submittedSpan = document.getElementById(`submitted-${category}`);
-        const displayDiv = document.getElementById(`display-${category}`);
-        
-        if (submittedSpan) {
-          submittedSpan.textContent = '';
-        }
-        
-        if (displayDiv) {
-          displayDiv.classList.remove('valid', 'invalid', 'empty');
-          displayDiv.classList.add('empty');
-        }
+
+      // Limpiar displays si existen (compatibilidad con layout anterior)
+      document.querySelectorAll('.word-display').forEach((displayDiv) => {
+        displayDiv.classList.remove('valid', 'invalid', 'empty');
+        displayDiv.classList.add('empty');
+        const text = displayDiv.querySelector('.word-text');
+        if (text) text.textContent = '';
       });
     }
 

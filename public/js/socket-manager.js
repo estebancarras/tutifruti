@@ -176,6 +176,22 @@ class SocketManager {
   getRooms() {
     this.emit(SOCKET_EVENTS.GET_ROOMS);
   }
+
+  /**
+   * Emite un voto de validación durante la fase de revisión
+   * @param {{roomId: string, voterName: string, targetPlayer: string, category: string, decision: 'valid'|'invalid'}} data
+   */
+  castVote(data) {
+    this.emit(SOCKET_EVENTS.CAST_VOTE, data);
+  }
+
+  /**
+   * Solicita avanzar a la siguiente ronda (solo host)
+   * @param {string} roomId
+   */
+  nextRound(roomId) {
+    this.emit(SOCKET_EVENTS.NEXT_ROUND, { roomId });
+  }
 }
 
 // Exportar instancia singleton
