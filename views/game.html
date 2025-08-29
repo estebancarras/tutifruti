@@ -45,9 +45,8 @@
       <div class="status-message" id="selectedLetter" aria-live="polite">
         Esperando que comience el juego...
       </div>
-      <div id="roulette" style="display: none;" role="img" aria-label="Ruleta de letras">
-        <!-- Contenido se genera dinámicamente -->
-      </div>
+      <div id="roulette" style="display: none;" role="img" aria-label="Ruleta de letras"></div>
+
     </section>
 
     <!-- Área de juego -->
@@ -206,6 +205,7 @@
               class="btn btn--secondary btn--lg" 
               style="display: none;"
               aria-describedby="spin-wheel-help">
+
         <span aria-hidden="true">🎰</span>
         Girar Ruleta
       </button>
@@ -458,15 +458,13 @@
 
     function handlePlayerJoined(data) {
       console.log('Jugador se unió:', data);
-      
-      if (data.players) {
+      if (data && data.players) {
         gameState.updatePlayers(data.players);
-        
-        const playerName = data.player?.name;
-        if (playerName && playerName !== gameState.username) {
-          uiManager.announce(`${playerName} se unió al juego`);
-          showNotification(`${playerName} se unió al juego`, 'info');
-        }
+      }
+      const playerName = data?.player?.name;
+      if (playerName && playerName !== gameState.username) {
+        uiManager.announce(`${playerName} se unió al juego`);
+        showNotification(`${playerName} se unió al juego`, 'info');
       }
     }
 

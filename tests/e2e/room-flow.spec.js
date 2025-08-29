@@ -14,9 +14,10 @@ test.describe('Flujo E2E: crear sala, unirse y arrancar juego', () => {
     await host.click('#createRoomButton');
     await expect(host).toHaveURL(/\/views\/create-room\.html/);
 
-    // Esperar código de sala
+    // Crear la sala y esperar el código
+    await host.click('#createRoomButton');
+    await expect(host.locator('#roomCodeValue')).toHaveText(/[a-z0-9]{5,}/i);
     const roomCode = await host.locator('#roomCodeValue').innerText();
-    expect(roomCode).toMatch(/[a-z0-9]{5,}/i);
 
     // INVITADO: index -> join-room -> ingresar código
     const contextGuest = await browser.newContext();
@@ -28,8 +29,12 @@ test.describe('Flujo E2E: crear sala, unirse y arrancar juego', () => {
     await guest.fill('#roomCodeInput', roomCode);
     await guest.click('#joinRoomButton');
 
-    // Sala de espera debería mostrar 2/5
-    await expect(guest.locator('#waiting-players-count')).toHaveText('2');
+    // Sala de espera: esperar overlay y 2 jugadores
+    await guest.waitForSelector('.waiting-room-container', { timeout: 10000 });
+    await expect(guest.locator('#waiting-players-count')).toHaveText('2', { timeout: 10000 });
+    // Host debería ver 2/5 y botón habilitado
+    await expect(host.locator('#playersCountDisplay')).toHaveText(/2\/\d+/, { timeout: 10000 });
+    await expect(host.locator('#goToGameButton')).toBeEnabled({ timeout: 10000 });
 
     // HOST: iniciar juego
     await host.click('#goToGameButton');

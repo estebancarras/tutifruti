@@ -480,8 +480,7 @@
       createRoomButton.disabled = true;
       createRoomButton.innerHTML = '<span class="spinner"></span> Creando...';
 
-      // Generar ID y crear sala
-      roomData.roomId = generateRoomId();
+      // Crear sala (el ID lo genera el servidor)
       roomData.roomName = roomName;
 
       socketManager.createRoom({

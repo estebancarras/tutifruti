@@ -107,10 +107,13 @@ app.get(['/views/create-room.html', '/views/join-room.html', '/views/game.html']
   res.sendFile(__dirname + req.path);
 });
 
-// Fallback para 404 claros (no interferir con Socket.IO)
+/**
+ * Fallback pasivo: dejar pasar para que otras rutas definidas más abajo (p. ej. /activeRooms)
+ * puedan manejar la solicitud. El 404 explícito debe ubicarse al final del stack.
+ */
 app.use((req, res, next) => {
   if (req.path.startsWith('/socket.io')) return next();
-  res.status(404).send('Recurso no encontrado');
+  next();
 });
 
 // Definir estructura de un estado de juego - FORMATO TUTTI FRUTTI CLÁSICO
@@ -962,12 +965,26 @@ app.get('/activeRooms', (req, res) => {
 });
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor escuchando en:`);
-    console.log(`- Local: http://localhost:${PORT}`);
-    console.log(`- Red: http://192.168.1.XXX:${PORT}`);
-    console.log(`Usa 'ipconfig' (Windows) o 'ifconfig' (Mac/Linux) para ver tu IP local`);
-});
+// Detectar entorno de tests de forma robusta (Jest o npm test)
+const IS_TEST_ENV = !!process.env.JEST_WORKER_ID || process.env.npm_lifecycle_event === 'test';
+
+// Solo levantar servidor fuera de tests y si no está ya escuchando
+if (!IS_TEST_ENV && !server.listening) {
+  try {
+    server.listen(PORT, '0.0.0.0', () => {
+      console.log(`Servidor escuchando en:`);
+      console.log(`- Local: http://localhost:${PORT}`);
+      console.log(`- Red: http://192.168.1.XXX:${PORT}`);
+      console.log(`Usa 'ipconfig' (Windows) o 'ifconfig' (Mac/Linux) para ver tu IP local`);
+    });
+  } catch (e) {
+    if (e && e.code === 'EADDRINUSE') {
+      console.warn(`Puerto ${PORT} en uso; usando instancia existente.`);
+    } else {
+      throw e;
+    }
+  }
+}
 
 // Export para pruebas
 module.exports = { server, io };

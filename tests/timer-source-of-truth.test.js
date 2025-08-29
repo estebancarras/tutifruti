@@ -5,7 +5,16 @@ const { io } = require('socket.io-client');
 
 const { server } = require('../server');
 
-const SERVER_URL = 'http://localhost:3000';
+let SERVER_URL;
+
+beforeAll(async () => {
+  if (!server.listening) {
+    await new Promise((resolve) => server.listen(0, () => resolve(true)));
+  }
+  const addr = server.address();
+  const port = typeof addr === 'object' && addr ? addr.port : 3000;
+  SERVER_URL = `http://localhost:${port}`;
+});
 
 function connectClient() {
   return io(SERVER_URL, { transports: ['websocket'], forceNew: true, reconnection: false });

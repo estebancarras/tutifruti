@@ -392,9 +392,8 @@
       // Unirse por código
       joinRoomForm.addEventListener('submit', handleJoinByCode);
       
-      // Formatear código en tiempo real
+      // Formatear código en tiempo real (visual: CSS uppercase; valor real sin modificar)
       roomCodeInput.addEventListener('input', (e) => {
-        e.target.value = e.target.value.toUpperCase();
         clearError();
       });
 
@@ -416,7 +415,7 @@
     function handleJoinByCode(e) {
       e.preventDefault();
       
-      const roomCode = roomCodeInput.value.trim().toUpperCase();
+      const roomCode = roomCodeInput.value.trim();
       
       if (!roomCode) {
         showError('Por favor, ingresa un código de sala');
