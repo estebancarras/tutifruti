@@ -417,16 +417,33 @@
       
       console.log(`Jugador actual: ${gameState.username}, Es creador: ${isCreator}`);
       
-      // Si ya se inició el juego, actualizar interfaz
-      if (data.isPlaying && data.currentLetter) {
+      // Si el juego está en curso pero aún no hay letra (venimos redirigidos tras SHOW_ROULETTE),
+      // debemos mostrar la ruleta y el botón de girar (habilitado solo para host)
+      if (data.isPlaying) {
         gameState.startGame();
-        gameState.setCurrentLetter(data.currentLetter);
-        // El tiempo solo se actualiza con TIMER_UPDATE del servidor
-      } else if (isCreator && !data.isPlaying) {
+        if (data.currentLetter) {
+          // Juego en curso con letra definida: habilitar inputs
+          gameState.setCurrentLetter(data.currentLetter);
+        } else {
+          // Juego en curso sin letra aún: mostrar ruleta y botón de girar
+          gameState.disableInputs();
+          uiManager.showRoulette();
+          if (spinWheelButton) {
+            spinWheelButton.style.display = 'block';
+            spinWheelButton.disabled = !isCreator;
+            spinWheelButton.innerHTML = isCreator
+              ? '<span aria-hidden="true">🎰</span> Girar Ruleta'
+              : '<span aria-hidden="true">⏳</span> Esperando al anfitrión';
+          }
+          document.getElementById('selectedLetter').textContent = isCreator
+            ? '¡Haz clic en "Girar Ruleta" para comenzar!'
+            : 'Esperando que el anfitrión gire la ruleta...';
+        }
+        if (startGameButton) startGameButton.style.display = 'none';
+      } else if (isCreator) {
         // Mostrar botón de iniciar juego si es el creador y el juego no ha empezado
-        const startButton = document.getElementById('startGameButton');
-        if (startButton) {
-          startButton.style.display = 'block';
+        if (startGameButton) {
+          startGameButton.style.display = 'block';
         }
         uiManager.announce('Eres el anfitrión. Puedes iniciar el juego cuando estés listo.');
       }
@@ -485,17 +502,25 @@
       console.log('Mostrando ruleta:', data);
       
       gameState.startGame();
+      // Mientras se muestra la ruleta nadie debería escribir
+      gameState.disableInputs();
       uiManager.showRoulette();
       
-      // Actualizar interfaz según el rol
-      if (gameState.isHost) {
+      // Mostrar SIEMPRE el botón de girar para evitar condiciones de carrera,
+      // deshabilitado para no‑host. El servidor valida permisos igualmente.
+      if (spinWheelButton) {
         spinWheelButton.style.display = 'block';
-        document.getElementById('selectedLetter').textContent = '¡Haz clic en "Girar Ruleta" para comenzar!';
-      } else {
-        document.getElementById('selectedLetter').textContent = 'Esperando que el anfitrión gire la ruleta...';
+        const isHost = !!gameState.isHost;
+        spinWheelButton.disabled = !isHost;
+        spinWheelButton.innerHTML = isHost
+          ? '<span aria-hidden="true">🎰</span> Girar Ruleta'
+          : '<span aria-hidden="true">⏳</span> Esperando al anfitrión';
       }
+      document.getElementById('selectedLetter').textContent = gameState.isHost
+        ? '¡Haz clic en "Girar Ruleta" para comenzar!'
+        : 'Esperando que el anfitrión gire la ruleta...';
       
-      startGameButton.style.display = 'none';
+      if (startGameButton) startGameButton.style.display = 'none';
       uiManager.announce('El juego ha comenzado. Esperando que se gire la ruleta.');
     }
 
@@ -517,33 +542,32 @@
 
     function handleRouletteResult(data) {
       console.log('[Game] handleRouletteResult ->', data);
-      
-      gameState.setCurrentLetter(data.letter);
-      
-      // Ocultar ruleta y mostrar letra
-      uiManager.hideRoulette();
-      uiManager.displaySelectedLetter(data.letter);
-      
-      // Ocultar botón de girar
-      spinWheelButton.style.display = 'none';
-      
-      // Sincronización: el temporizador se renderiza solo con TIMER_UPDATE
-      
-      // Verificar que los inputs estén habilitados
+
+      // Mantener la ruleta visible y girarla exactamente a la letra enviada
+      if (typeof uiManager.spinToLetter === 'function') {
+        uiManager.spinToLetter(data.letter);
+      }
+
+      // Ocultar botón de girar para todos
+      if (spinWheelButton) {
+        spinWheelButton.style.display = 'none';
+      }
+
+      // Tras la animación, mostrar letra grande y habilitar inputs para todos
       setTimeout(() => {
-        const inputs = document.querySelectorAll('.word-input');
-        const enabledInputs = Array.from(inputs).filter(input => !input.disabled);
-        console.log('[Game] Inputs habilitados después de rouletteResult:', enabledInputs.length);
-        
-        // Enfocar primer input
+        uiManager.hideRoulette();
+        uiManager.displaySelectedLetter(data.letter);
+
+        // Establecer estado y habilitar inputs (servidor es la fuente de verdad)
+        gameState.setCurrentLetter(data.letter);
+        gameState.enableInputs();
+
+        // Enfocar primer input disponible por accesibilidad
         const firstInput = document.querySelector('#input-NOMBRE');
         if (firstInput && !firstInput.disabled) {
-          firstInput.focus();
-          console.log('[Game] Foco establecido en primer input');
-        } else {
-          console.warn('[Game] Primer input no disponible o deshabilitado');
+          try { firstInput.focus(); } catch (_) {}
         }
-      }, 100);
+      }, 1200);
     }
 
     function handleTimerUpdate(data) {
@@ -579,12 +603,17 @@
       
       // Preparar para la siguiente ronda
       setTimeout(() => {
-        if (gameState.isHost) {
+        if (spinWheelButton) {
           spinWheelButton.style.display = 'block';
-          document.getElementById('selectedLetter').textContent = '¡Listo para la siguiente ronda! Gira la ruleta.';
-        } else {
-          document.getElementById('selectedLetter').textContent = 'Esperando la siguiente ronda...';
+          const isHost = !!gameState.isHost;
+          spinWheelButton.disabled = !isHost;
+          spinWheelButton.innerHTML = isHost
+            ? '<span aria-hidden="true">🎰</span> Girar Ruleta'
+            : '<span aria-hidden="true">⏳</span> Esperando al anfitrión';
         }
+        document.getElementById('selectedLetter').textContent = gameState.isHost
+          ? '¡Listo para la siguiente ronda! Gira la ruleta.'
+          : 'Esperando la siguiente ronda...';
         
         uiManager.showRoulette();
       }, 5000);

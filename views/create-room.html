@@ -308,6 +308,25 @@
           </div>
 
           <div class="form-group">
+            <label for="rounds" class="form-label">
+              Rondas
+            </label>
+            <input
+              type="number"
+              id="rounds"
+              name="rounds"
+              class="form-input"
+              value="5"
+              min="1"
+              max="20"
+              aria-describedby="rounds-help"
+            >
+            <span id="rounds-help" class="form-help">
+              Número de rondas (1–20). Predeterminado: 5.
+            </span>
+          </div>
+
+          <div class="form-group">
             <button type="submit" id="createRoomButton" class="btn btn--primary btn--full">
               <span aria-hidden="true">🚀</span>
               Crear Sala
@@ -378,6 +397,7 @@
     const createRoomForm = document.getElementById('createRoomForm');
     const playerNameInput = document.getElementById('playerName');
     const roomNameInput = document.getElementById('roomName');
+    const roundsInput = document.getElementById('rounds');
     const createRoomButton = document.getElementById('createRoomButton');
     const roomTitle = document.getElementById('roomTitle');
     const roomCodeValue = document.getElementById('roomCodeValue');
@@ -481,12 +501,12 @@
       createRoomButton.innerHTML = '<span class="spinner"></span> Creando...';
 
       // Crear sala (el ID lo genera el servidor)
-      roomData.roomName = roomName;
 
       socketManager.createRoom({
         playerName: username,
         roomName: roomName,
-        maxPlayers: GAME_CONFIG.MAX_PLAYERS
+        maxPlayers: GAME_CONFIG.MAX_PLAYERS,
+        rounds: Math.max(1, Math.min(20, parseInt(roundsInput?.value, 10) || 5))
       });
     }
 

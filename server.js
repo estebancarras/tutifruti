@@ -1,3 +1,4 @@
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -122,6 +123,7 @@ const createGameState = (roomId, maxPlayers = 5) => {
     roomId,
     players: [],
     maxPlayers,
+    maxRounds: 5, // Número de rondas por defecto (configurable al crear sala)
     isPlaying: false,
     currentRound: 0,
     currentLetter: '',
@@ -235,7 +237,7 @@ io.on('connection', (socket) => {
   });
 
   // Crear una nueva sala
-  socket.on('createRoom', ({ playerName, roomName, maxPlayers, isPrivate, password }) => {
+  socket.on('createRoom', ({ playerName, roomName, maxPlayers, isPrivate, password, rounds }) => {
     if (!checkRateLimit(socket, 'createRoom', 2, 60_000)) {
       logEvent({ socket, event: 'createRoom', level: 'warn', message: 'Rate limit' });
       return socket.emit('error', { message: 'Demasiadas solicitudes para crear sala. Intenta de nuevo en un momento.' });
@@ -260,6 +262,9 @@ io.on('connection', (socket) => {
     gameStates[roomId].creator = playerName;
     gameStates[roomId].private = isPrivate;
     gameStates[roomId].password = password;
+    // Configurar número de rondas (1..20)
+    const parsedRounds = (typeof rounds === 'number' && isFinite(rounds)) ? Math.floor(rounds) : NaN;
+    gameStates[roomId].maxRounds = (!isNaN(parsedRounds) ? Math.max(1, Math.min(20, parsedRounds)) : 5);
     
     // Añadir el primer jugador (creador)
     gameStates[roomId].players.push({
@@ -538,6 +543,21 @@ io.on('connection', (socket) => {
       gameState.currentRound++;
       gameState.timeRemaining = gameState.timeLimit;
       gameState.showRoulette = true; // Mostrar ruleta para la siguiente ronda
+
+      // Decidir siguiente paso: nueva ronda o fin de juego
+      if (gameState.currentRound > (gameState.maxRounds || 5)) {
+        const finalResults = gameState.players.map(p => ({ name: p.name, score: p.score }));
+        io.to(roomId).emit('gameEnded', { results: finalResults });
+        gameState.isPlaying = false;
+        gameState.showRoulette = false;
+      } else {
+        setTimeout(() => {
+          // Mostrar ruleta para la siguiente ronda
+          io.to(roomId).emit('showRoulette', {
+            round: gameState.currentRound
+          });
+        }, 2500);
+      }
     }
     
     logEvent({ socket, event: 'submitWords', roomId, message: `${playerName} envió sus palabras` });
@@ -731,6 +751,20 @@ function startTimer(roomId) {
       gameState.currentRound++;
       gameState.timeRemaining = gameState.timeLimit;
       gameState.timerEndsAt = null;
+
+      // Decidir siguiente paso: nueva ronda o fin de juego
+      if (gameState.currentRound > (gameState.maxRounds || 5)) {
+        const finalResults = gameState.players.map(p => ({ name: p.name, score: p.score }));
+        io.to(roomId).emit('gameEnded', { results: finalResults });
+        gameState.isPlaying = false;
+        gameState.showRoulette = false;
+      } else {
+        setTimeout(() => {
+          io.to(roomId).emit('showRoulette', {
+            round: gameState.currentRound
+          });
+        }, 2500);
+      }
     }
   }, 1000);
 }

@@ -178,16 +178,51 @@ class UIManager {
   }
 
   /**
-   * Anima el giro de la ruleta
+   * Anima el giro de la ruleta (giro preliminar al azar)
+   * Mantiene el ángulo acumulado en data-rotation para poder alinear luego con una letra concreta.
    */
   animateRouletteSpinning() {
     const wheel = document.getElementById('rouletteWheel');
     if (wheel) {
-      wheel.style.animation = 'spin 3s ease-out';
-      wheel.style.transform = `rotate(${Math.random() * 360 + 1080}deg)`;
-      
+      const current = Number(wheel.dataset.rotation || 0);
+      const spin = 360 * 3 + Math.floor(Math.random() * 360);
+      const target = current + spin;
+      wheel.style.transition = 'transform 3s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      wheel.style.transform = `rotate(${target}deg)`;
+      wheel.dataset.rotation = String(target);
       this.announce('La ruleta está girando');
     }
+  }
+
+  /**
+   * Gira la ruleta hasta una letra concreta enviada por el servidor
+   * para que el puntero apunte exactamente a esa letra.
+   * @param {string} letter - Letra objetivo (A-Z)
+   */
+  spinToLetter(letter) {
+    const wheel = document.getElementById('rouletteWheel');
+    if (!wheel || !letter) return;
+
+    const alphabet = GAME_CONFIG.ALPHABET || 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const idx = alphabet.indexOf(letter.toUpperCase());
+    if (idx < 0) return;
+
+    const step = 360 / alphabet.length;
+    const letterAngle = idx * step;
+
+    // Ángulo actual normalizado [0,360)
+    const current = Number(wheel.dataset.rotation || 0);
+    const currentMod = ((current % 360) + 360) % 360;
+
+    // Queremos que la letra en letterAngle quede bajo el puntero superior (0deg).
+    // Para ello, rotamos hacia adelante (dos vueltas completas para efecto visual) hasta alinear:
+    const forwardTurns = 2 * 360;
+    const needed = (360 - letterAngle - currentMod + 360) % 360;
+    const target = current + forwardTurns + needed;
+
+    wheel.style.transition = 'transform 1.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
+    wheel.style.transform = `rotate(${target}deg)`;
+    wheel.dataset.rotation = String(target);
   }
 
   /**
