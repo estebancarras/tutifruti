@@ -230,17 +230,28 @@ io.on('connection', (socket) => {
 
     updateActiveRoomsCount(roomId);
 
-    socket.emit('roomState', {
-      roomId: gameState.roomId,
-      players: getConnectedPlayers(gameState),
-      isPlaying: gameState.isPlaying,
-      currentRound: gameState.currentRound,
-      currentLetter: gameState.currentLetter,
-      timeRemaining: gameState.timeRemaining,
-      categories: gameState.categories,
-      serverTime: Date.now(),
-      timerEndsAt: gameState.timerEndsAt || null
-    });
+    // Si estamos en fase de revisión, enviar datos de revisión
+    if (gameState.roundPhase === 'review' && gameState.reviewData) {
+      socket.emit('startReview', {
+        round: gameState.currentRound,
+        letter: gameState.currentLetter,
+        message: 'Reconectado durante revisión. Continuando...',
+        reviewUrl: `/views/review.html?roomId=${roomId}`
+      });
+    } else {
+      // Enviar estado actual de la sala
+      socket.emit('roomState', {
+        roomId: gameState.roomId,
+        players: getConnectedPlayers(gameState),
+        isPlaying: gameState.isPlaying,
+        currentRound: gameState.currentRound,
+        currentLetter: gameState.currentLetter,
+        timeRemaining: gameState.timeRemaining,
+        categories: gameState.categories,
+        serverTime: Date.now(),
+        timerEndsAt: gameState.timerEndsAt || null
+      });
+    }
     logEvent({ socket, event: 'reconnectPlayer', roomId, message: 'Re-conectado y estado enviado' });
   });
 
@@ -411,13 +422,13 @@ io.on('connection', (socket) => {
     gameState.roundPhase = 'writing';
     
     // Generar letra aleatoria inmediatamente
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
-    
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+      
     // Emit directo sin ruleta - ROUNDSTART inmediato
     io.to(roomId).emit('roundStart', {
-      letter: gameState.currentLetter,
-      timeLimit: gameState.timeLimit,
+        letter: gameState.currentLetter,
+        timeLimit: gameState.timeLimit,
       round: gameState.currentRound,
       categories: gameState.categories
     });
@@ -524,6 +535,14 @@ io.on('connection', (socket) => {
         letter: gameState.currentLetter,
         message: '¡Hora de revisar las palabras! Redirigiéndote...',
         reviewUrl: `/views/review.html?roomId=${roomId}`
+      });
+      
+      // Debug: verificar estado de la sala
+      console.log(`🔍 [DEBUG] Sala ${roomId} en revisión:`, {
+        players: gameState.players.length,
+        connected: getConnectedPlayers(gameState).length,
+        isPlaying: gameState.isPlaying,
+        roundPhase: gameState.roundPhase
       });
       
       logEvent({ event: 'startReview', roomId, message: `Iniciada revisión para ronda ${gameState.currentRound}` });
@@ -977,12 +996,12 @@ io.on('connection', (socket) => {
       console.error('[FinishReview] Error:', error);
     }
   });
-  
+
   // Manejar desconexión
   socket.on('disconnect', () => {
     const roomId = socket.roomId;
     const playerName = socket.playerName;
-
+    
     if (!roomId || !gameStates[roomId]) {
       logEvent({ socket, event: 'disconnect', level: 'info', message: 'Cliente desconectado (sin sala)' });
       return;
@@ -1040,18 +1059,19 @@ io.on('connection', (socket) => {
       updateActiveRoomsCount(roomId);
 
       // Notificar a los demás jugadores de forma definitiva
-      if (gameStates[roomId]) {
-        io.to(roomId).emit('playerLeft', {
-          playerName,
+        if (gameStates[roomId]) {
+          io.to(roomId).emit('playerLeft', {
+            playerName,
           players: getConnectedPlayers(gs)
         });
       }
 
       // Eliminar sala si está vacía (sin conectados) y no está en juego
-      if (!gs.isPlaying && getConnectedPlayers(gs).length === 0) {
+      // IMPORTANTE: NO eliminar salas durante la fase de revisión
+      if (!gs.isPlaying && gs.roundPhase !== 'review' && getConnectedPlayers(gs).length === 0) {
         setTimeout(() => {
           const ref = gameStates[roomId];
-          if (ref && getConnectedPlayers(ref).length === 0) {
+          if (ref && getConnectedPlayers(ref).length === 0 && ref.roundPhase !== 'review') {
             delete gameStates[roomId];
             const roomIndex = activeRooms.findIndex(room => room.roomId === roomId);
             if (roomIndex !== -1) {
@@ -1116,17 +1136,17 @@ function startTimer(roomId) {
       // Fin del tiempo: puntuar directamente (flujo legacy)
       if (gameState.isPlaying) {
         const scores = calculateClassicScores(gameState);
-        Object.keys(scores).forEach(player => {
+      Object.keys(scores).forEach(player => {
           const idx = gameState.players.findIndex(p => p.name === player);
           if (idx !== -1) {
             gameState.players[idx].score += scores[player].total;
           }
         });
         
-        io.to(roomId).emit('roundEnded', {
+      io.to(roomId).emit('roundEnded', {
           scores,
-          words: gameState.words,
-          validWords: gameState.validWords,
+        words: gameState.words,
+        validWords: gameState.validWords,
           playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
           letter: gameState.currentLetter
         });
@@ -1137,10 +1157,10 @@ function startTimer(roomId) {
           endGame(roomId);
           gameState.timerEndsAt = null;
         } else {
-          gameState.words = {};
-          gameState.validWords = {};
-          gameState.currentRound++;
-          gameState.timeRemaining = gameState.timeLimit;
+      gameState.words = {};
+      gameState.validWords = {};
+      gameState.currentRound++;
+      gameState.timeRemaining = gameState.timeLimit;
           gameState.timerEndsAt = null;
           
           // NUEVO FLUJO: Auto-letter para siguiente ronda
@@ -1684,12 +1704,12 @@ const IS_TEST_ENV = !!process.env.JEST_WORKER_ID || process.env.npm_lifecycle_ev
 // Solo levantar servidor fuera de tests y si no está ya escuchando
 if (!IS_TEST_ENV && !server.listening) {
   try {
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`Servidor escuchando en:`);
-      console.log(`- Local: http://localhost:${PORT}`);
-      console.log(`- Red: http://192.168.1.XXX:${PORT}`);
-      console.log(`Usa 'ipconfig' (Windows) o 'ifconfig' (Mac/Linux) para ver tu IP local`);
-    });
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Servidor escuchando en:`);
+    console.log(`- Local: http://localhost:${PORT}`);
+    console.log(`- Red: http://192.168.1.XXX:${PORT}`);
+    console.log(`Usa 'ipconfig' (Windows) o 'ifconfig' (Mac/Linux) para ver tu IP local`);
+});
   } catch (e) {
     if (e && e.code === 'EADDRINUSE') {
       console.warn(`Puerto ${PORT} en uso; usando instancia existente.`);
