@@ -67,6 +67,12 @@ class SocketManager {
       console.error('Error de Socket.IO:', error);
       showNotification(error.message || 'Error de conexión', 'error');
     });
+    
+    // Sistema de heartbeat para mantener conexión activa
+    this.socket.on('heartbeat', (data) => {
+      // Responder al heartbeat para mantener la conexión
+      this.socket.emit('heartbeat_ack', { timestamp: data.timestamp });
+    });
   }
 
   /**

@@ -6,6 +6,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const mongoose = require('mongoose');
 
 // Cargar variables de entorno
@@ -16,13 +17,39 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Configurar sesiones
-const sessionMiddleware = session({
+// Configurar sesiones con store robusto para producción
+let sessionConfig = {
   secret: process.env.SESSION_SECRET || 'tutifruti_secret_key',
   resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false } // En producción, establecer a true si se usa HTTPS
-});
+  saveUninitialized: false, // Cambiar a false para evitar sesiones vacías
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production', // true en producción
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 horas
+    sameSite: 'lax'
+  },
+  name: 'tutifruti.sid', // Nombre personalizado de la cookie
+  rolling: true // Renovar cookie en cada request
+};
+
+// Intentar usar MongoDB si está disponible, sino usar configuración mejorada
+try {
+  if (process.env.MONGODB_URI || process.env.NODE_ENV === 'production') {
+    sessionConfig.store = MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI || 'mongodb://localhost:27017/tutifruti',
+      collectionName: 'sessions',
+      ttl: 24 * 60 * 60, // 24 horas en segundos
+      autoRemove: 'native' // Usar TTL nativo de MongoDB
+    });
+    console.log('✅ Usando MongoDB como store de sesiones');
+  } else {
+    console.log('⚠️ MongoDB no disponible, usando configuración mejorada de sesiones');
+  }
+} catch (error) {
+  console.log('⚠️ Error configurando MongoDB store, usando configuración mejorada:', error.message);
+}
+
+const sessionMiddleware = session(sessionConfig);
 
 app.use(sessionMiddleware);
 
@@ -32,12 +59,29 @@ const io = new Server(server, {
   cors: {
     origin: '*', // En producción, limitar a dominios específicos
     methods: ['GET', 'POST']
-  }
+  },
+  // Configuración robusta para producción
+  pingTimeout: 60000, // 60 segundos
+  pingInterval: 25000, // 25 segundos
+  transports: ['websocket', 'polling'], // Fallback a polling si websocket falla
+  allowEIO3: true, // Compatibilidad con versiones anteriores
+  maxHttpBufferSize: 1e6 // 1MB buffer
 });
 
 // Compartir sesión entre Express y Socket.io
 io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next);
+});
+
+// Middleware para manejar reconexiones robustas
+io.use((socket, next) => {
+  // Agregar timestamp de conexión
+  socket.connectedAt = Date.now();
+  
+  // Log de conexión
+  console.log(`🔌 [SOCKET] Nuevo cliente conectado: ${socket.id}`);
+  
+  next();
 });
 
 // Estructura de datos para el juego
@@ -48,6 +92,10 @@ let gameStates = {};
 const disconnectTimers = new Map(); // key: `${roomId}:${playerName}` -> timeout id
 const GRACE_PERIOD_MS = 15000;
 const REVIEW_TIME_MS = 20000; // Duración de la fase de revisión/votación
+
+// Sistema de heartbeat para detectar desconexiones
+const heartbeatIntervals = new Map(); // key: socket.id -> interval id
+const HEARTBEAT_INTERVAL = 30000; // 30 segundos
 
 // Helpers de conteo de conectados y actualización de sala
 function getConnectedPlayers(gameState) {
@@ -155,8 +203,26 @@ const createGameState = (roomId, maxPlayers = 5) => {
 io.on('connection', (socket) => {
   console.log('Nuevo cliente conectado:', socket.id);
   
+  // Configurar heartbeat para este socket
+  const heartbeatInterval = setInterval(() => {
+    if (socket.connected) {
+      socket.emit('heartbeat', { timestamp: Date.now() });
+    } else {
+      clearInterval(heartbeatInterval);
+      heartbeatIntervals.delete(socket.id);
+    }
+  }, HEARTBEAT_INTERVAL);
+  
+  heartbeatIntervals.set(socket.id, heartbeatInterval);
+  
   // Enviar la lista de salas activas al nuevo cliente
   socket.emit('activeRooms', activeRooms);
+  
+  // Manejar heartbeat del cliente
+  socket.on('heartbeat_ack', (data) => {
+    // Cliente respondió al heartbeat, conexión está activa
+    socket.lastHeartbeat = Date.now();
+  });
   
   // Manejar solicitud de salas activas
   socket.on('getRooms', () => {
@@ -999,6 +1065,12 @@ io.on('connection', (socket) => {
 
   // Manejar desconexión
   socket.on('disconnect', () => {
+    // Limpiar heartbeat
+    if (heartbeatIntervals.has(socket.id)) {
+      clearInterval(heartbeatIntervals.get(socket.id));
+      heartbeatIntervals.delete(socket.id);
+    }
+    
     const roomId = socket.roomId;
     const playerName = socket.playerName;
     
