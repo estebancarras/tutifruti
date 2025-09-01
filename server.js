@@ -6,7 +6,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+// MongoDB removido para compatibilidad con Render
 const mongoose = require('mongoose');
 
 // Cargar variables de entorno
@@ -17,41 +17,52 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Configurar sesiones con store robusto para producción
+// Configurar sesiones optimizadas para Render (sin MongoDB)
 let sessionConfig = {
   secret: process.env.SESSION_SECRET || 'tutifruti_secret_key',
-  resave: false,
-  saveUninitialized: false, // Cambiar a false para evitar sesiones vacías
+  resave: true, // Cambiar a true para mejor compatibilidad
+  saveUninitialized: true, // Cambiar a true para evitar problemas
   cookie: { 
-    secure: process.env.NODE_ENV === 'production', // true en producción
+    secure: false, // false en Render para compatibilidad
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 horas
+    maxAge: 2 * 60 * 60 * 1000, // 2 horas (más corto para memoria)
     sameSite: 'lax'
   },
-  name: 'tutifruti.sid', // Nombre personalizado de la cookie
-  rolling: true // Renovar cookie en cada request
+  name: 'tutifruti.sid',
+  rolling: true
 };
 
-// Intentar usar MongoDB si está disponible, sino usar configuración mejorada
-try {
-  if (process.env.MONGODB_URI || process.env.NODE_ENV === 'production') {
-    sessionConfig.store = MongoStore.create({
-      mongoUrl: process.env.MONGODB_URI || 'mongodb://localhost:27017/tutifruti',
-      collectionName: 'sessions',
-      ttl: 24 * 60 * 60, // 24 horas en segundos
-      autoRemove: 'native' // Usar TTL nativo de MongoDB
-    });
-    console.log('✅ Usando MongoDB como store de sesiones');
-  } else {
-    console.log('⚠️ MongoDB no disponible, usando configuración mejorada de sesiones');
-  }
-} catch (error) {
-  console.log('⚠️ Error configurando MongoDB store, usando configuración mejorada:', error.message);
-}
+// SOLUCIÓN PARA RENDER: No usar MongoDB, solo configuración mejorada
+console.log('🚀 Configurando servidor para entorno de producción (sin MongoDB)');
+console.log('📊 Usando configuración robusta de sesiones en memoria');
 
 const sessionMiddleware = session(sessionConfig);
 
 app.use(sessionMiddleware);
+
+// Sistema de limpieza automática de sesiones (cada 5 minutos)
+setInterval(() => {
+  try {
+    // Limpiar sesiones expiradas
+    if (sessionMiddleware.store && sessionMiddleware.store.all) {
+      sessionMiddleware.store.all((err, sessions) => {
+        if (!err && sessions) {
+          const now = Date.now();
+          Object.keys(sessions).forEach(sessionId => {
+            const session = sessions[sessionId];
+            if (session && session.cookie && session.cookie.expires) {
+              if (new Date(session.cookie.expires) < now) {
+                sessionMiddleware.store.destroy(sessionId);
+              }
+            }
+          });
+        }
+      });
+    }
+  } catch (error) {
+    // Ignorar errores de limpieza
+  }
+}, 5 * 60 * 1000); // 5 minutos
 
 // Crear servidor HTTP y Socket.io
 const server = http.createServer(app);
@@ -60,12 +71,12 @@ const io = new Server(server, {
     origin: '*', // En producción, limitar a dominios específicos
     methods: ['GET', 'POST']
   },
-  // Configuración robusta para producción
-  pingTimeout: 60000, // 60 segundos
-  pingInterval: 25000, // 25 segundos
-  transports: ['websocket', 'polling'], // Fallback a polling si websocket falla
-  allowEIO3: true, // Compatibilidad con versiones anteriores
-  maxHttpBufferSize: 1e6 // 1MB buffer
+  // Configuración optimizada para Render
+  pingTimeout: 30000, // 30 segundos (más corto)
+  pingInterval: 15000, // 15 segundos (más frecuente)
+  transports: ['websocket'], // Solo websocket para mejor performance
+  allowEIO3: true,
+  maxHttpBufferSize: 512000 // 512KB buffer (más pequeño)
 });
 
 // Compartir sesión entre Express y Socket.io
@@ -93,9 +104,9 @@ const disconnectTimers = new Map(); // key: `${roomId}:${playerName}` -> timeout
 const GRACE_PERIOD_MS = 15000;
 const REVIEW_TIME_MS = 20000; // Duración de la fase de revisión/votación
 
-// Sistema de heartbeat para detectar desconexiones
+// Sistema de heartbeat optimizado para Render
 const heartbeatIntervals = new Map(); // key: socket.id -> interval id
-const HEARTBEAT_INTERVAL = 30000; // 30 segundos
+const HEARTBEAT_INTERVAL = 45000; // 45 segundos (menos agresivo)
 
 // Helpers de conteo de conectados y actualización de sala
 function getConnectedPlayers(gameState) {
@@ -130,7 +141,7 @@ function checkRateLimit(socket, eventKey, limit, intervalMs) {
   return true;
 }
 
-// Logging mínimo estructurado
+// Logging mejorado para diagnóstico
 function logEvent({ socket, event, roomId = null, level = 'info', message = '', error = null, extra = {} }) {
   const payload = {
     ts: new Date().toISOString(),
@@ -140,9 +151,20 @@ function logEvent({ socket, event, roomId = null, level = 'info', message = '', 
     socketId: socket?.id,
     message,
     error: error ? String(error) : undefined,
+    memoryUsage: process.memoryUsage(),
     ...extra
   };
-  // eslint-disable-next-line no-console
+  
+  // Log detallado para errores
+  if (level === 'error') {
+    console.error(`❌ [${event}] ${message}`, error || '');
+  } else if (level === 'warn') {
+    console.warn(`⚠️ [${event}] ${message}`);
+  } else {
+    console.log(`ℹ️ [${event}] ${message}`);
+  }
+  
+  // Log estructurado para análisis
   console.log(JSON.stringify(payload));
 }
 
