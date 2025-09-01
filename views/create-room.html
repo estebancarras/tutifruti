@@ -506,6 +506,15 @@
           window.location.href = `${ROUTES.GAME}?roomId=${roomData.roomId}`;
         }
       });
+      
+      // Manejar inicio de revisión social
+      socketManager.on(SOCKET_EVENTS.START_REVIEW, (data) => {
+        console.log('Redirigiendo a revisión desde create-room:', data);
+        showNotification(data.message || 'Iniciando revisión de palabras...', 'info');
+        setTimeout(() => {
+          window.location.href = data.reviewUrl || `${ROUTES.REVIEW}?roomId=${roomData.roomId}`;
+        }, 1500);
+      });
     }
 
     function handleCreateRoom(e) {

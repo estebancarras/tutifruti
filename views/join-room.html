@@ -410,6 +410,16 @@
       socketManager.on(SOCKET_EVENTS.PLAYER_JOINED, handlePlayerJoined);
       socketManager.on(SOCKET_EVENTS.PLAYER_LEFT, handlePlayerLeft);
       socketManager.on(SOCKET_EVENTS.ROUND_START, handleGameStart);
+      
+      // Manejar inicio de revisión social
+      socketManager.on(SOCKET_EVENTS.START_REVIEW, (data) => {
+        console.log('Redirigiendo a revisión desde join-room:', data);
+        showNotification(data.message || 'Iniciando revisión de palabras...', 'info');
+        const roomId = storage.getCurrentRoomId();
+        setTimeout(() => {
+          window.location.href = data.reviewUrl || `${ROUTES.REVIEW}?roomId=${roomId}`;
+        }, 1500);
+      });
     }
 
     function handleJoinByCode(e) {

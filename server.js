@@ -51,7 +51,7 @@ const REVIEW_TIME_MS = 20000; // Duración de la fase de revisión/votación
 
 // Helpers de conteo de conectados y actualización de sala
 function getConnectedPlayers(gameState) {
-  return (gameState.players || []).filter(p => p.connected !== false);
+  return (gameState.players || []).filter(p => p.connected === true);
 }
 function updateActiveRoomsCount(roomId) {
   const gameState = gameStates[roomId];
@@ -511,7 +511,7 @@ io.on('connection', (socket) => {
       let startPlayerIndex = 0;
       for (let i = 0; i < gameState.players.length; i++) {
         const player = gameState.players[i];
-        if (gameState.words[player.id] && Object.keys(gameState.words[player.id]).length > 0) {
+        if (gameState.words[player.name] && Object.keys(gameState.words[player.name]).length > 0) {
           startPlayerIndex = i;
           break;
         }
@@ -557,7 +557,7 @@ io.on('connection', (socket) => {
       round: gameState.currentRound,
       letter: gameState.currentLetter,
       message: `¡${playerName} ha terminado! Iniciando revisión...`,
-      reviewUrl: `${ROUTES.REVIEW}?roomId=${roomId}`
+      reviewUrl: `/views/review.html?roomId=${roomId}`
     });
     
     logEvent({ socket, event: 'forceEndRound', roomId, message: `${playerName} forzó fin de ronda` });
@@ -762,7 +762,7 @@ io.on('connection', (socket) => {
       }
 
       // Unirse a sala de revisión
-      socket.join(`${roomId}-review`);
+      // Ya están en la sala principal roomId, no necesitan sala separada
 
       // Preparar datos de revisión si no existen
       if (!gameState.reviewData) {
@@ -860,7 +860,7 @@ io.on('connection', (socket) => {
       }
 
       // Broadcast actualización de voto
-      io.to(`${roomId}-review`).emit('voteUpdate', {
+      io.to(roomId).emit('voteUpdate', {
         wordId,
         playerId: player.id,
         vote,
@@ -920,7 +920,7 @@ io.on('connection', (socket) => {
       updatePlayerScoresFromReview(gameState, finalResults);
 
       // Notificar fin de revisión
-      io.to(`${roomId}-review`).emit('reviewEnded', {
+      io.to(roomId).emit('reviewEnded', {
         finalResults,
         playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
         round: gameState.currentRound
@@ -1356,16 +1356,16 @@ function advanceToNextPlayer(roomId) {
     }
     
     const nextPlayer = gameState.players[nextIndex];
-    if (nextPlayer && gameState.words[nextPlayer.id] && Object.keys(gameState.words[nextPlayer.id]).length > 0) {
+    if (nextPlayer && gameState.words[nextPlayer.name] && Object.keys(gameState.words[nextPlayer.name]).length > 0) {
       // Jugador encontrado con palabras
       gameState.reviewData.currentPlayerIndex = nextIndex;
       
       // Broadcast cambio de jugador
-      io.to(`${roomId}-review`).emit('playerChange', {
+      io.to(roomId).emit('playerChange', {
         playerIndex: nextIndex,
         playerId: nextPlayer.id,
         playerName: nextPlayer.name,
-        words: gameState.words[nextPlayer.id]
+        words: gameState.words[nextPlayer.name]
       });
       
       return;
@@ -1389,7 +1389,7 @@ function finishReviewAutomatically(roomId) {
   const finalResults = processFinalReviewResults(gameState);
   updatePlayerScoresFromReview(gameState, finalResults);
 
-  io.to(`${roomId}-review`).emit('reviewEnded', {
+  io.to(roomId).emit('reviewEnded', {
     finalResults,
     playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
     round: gameState.currentRound,
