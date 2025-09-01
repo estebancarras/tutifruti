@@ -6,8 +6,8 @@ export const GAME_CONFIG = {
   MAX_PLAYERS: 5,
   TIME_LIMIT: 60,
   REVIEW_TIME: 20, // segundos para fase de revisión/votación
-  // Categorías ampliadas por defecto (10). Se puede hacer configurable por sala en el futuro.
-  CATEGORIES: ['NOMBRE', 'ANIMAL', 'COSA', 'FRUTA', 'PAIS', 'COLOR', 'COMIDA', 'CIUDAD', 'PROFESION', 'MARCA'],
+  // Categorías expandidas para grid 4x3 (12 total). Futuro: configurable por sala
+  CATEGORIES: ['NOMBRE', 'ANIMAL', 'COSA', 'FRUTA', 'PAIS', 'COLOR', 'COMIDA', 'CIUDAD', 'PROFESION', 'MARCA', 'DEPORTE', 'PELICULA'],
   ALPHABET: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 };
 
@@ -37,7 +37,9 @@ export const ROUTES = {
   HOME: '/index.html',
   CREATE_ROOM: '/views/create-room.html',
   JOIN_ROOM: '/views/join-room.html',
-  GAME: '/views/game.html'
+  GAME: '/views/game.html',
+  REVIEW: '/views/review.html',
+  RESULTS: '/views/results.html'
 };
 
 export const STORAGE_KEYS = {
@@ -69,16 +71,25 @@ export const SOCKET_EVENTS = {
   
   // Juego
   START_GAME: 'startGame',
-  SPIN_ROULETTE: 'spinRoulette',
-  SHOW_ROULETTE: 'showRoulette',
-  ROULETTE_SPINNING: 'rouletteSpinning',
-  ROULETTE_RESULT: 'rouletteResult',
-  // Nuevo flujo sin ruleta visible
+  // ELIMINADOS: Eventos de ruleta ya no necesarios
+  // SPIN_ROULETTE: 'spinRoulette',
+  // SHOW_ROULETTE: 'showRoulette', 
+  // ROULETTE_SPINNING: 'rouletteSpinning',
+  // ROULETTE_RESULT: 'rouletteResult',
+  // Flujo principal: Auto-letter + round start inmediato
   ROUND_START: 'roundStart',       // server -> clients (inicio de ronda con letra)
+  
+  // Sistema de validación social y revisión
   START_REVIEW: 'startReview',     // server -> clients (comienza revisión)
+  JOIN_REVIEW_ROOM: 'joinReviewRoom', // client -> server (unirse a revisión)
+  REVIEW_DATA: 'reviewData',       // server -> client (datos de revisión)
   CAST_VOTE: 'castVote',           // client -> server (emitir voto)
-  VOTE_UPDATE: 'voteUpdate',       // server -> clients (opcional, progreso)
+  VOTE_UPDATE: 'voteUpdate',       // server -> clients (actualización de votos)
+  PLAYER_CHANGE: 'playerChange',   // server -> clients (cambio de jugador)
   REVIEW_ENDED: 'reviewEnded',     // server -> clients (resultado de revisión)
+  REVIEW_ERROR: 'reviewError',     // server -> client (error en revisión)
+  FINISH_REVIEW: 'finishReview',   // client -> server (terminar revisión)
+  SKIP_CURRENT_PLAYER: 'skipCurrentPlayer', // client -> server (saltar jugador)
   NEXT_ROUND: 'nextRound',         // client -> server (host avanza a siguiente ronda)
 
   SUBMIT_WORDS: 'submitWords',

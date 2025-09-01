@@ -10,33 +10,33 @@
   <link rel="stylesheet" href="/public/css/base.css">
   <link rel="stylesheet" href="/public/css/components.css">
   <link rel="stylesheet" href="/public/css/game.css">
+  <link rel="stylesheet" href="/public/css/game-nextgen.css">
   
   <!-- Socket.IO -->
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body class="game-layout">
-  <!-- Header del juego -->
-  <header class="game-header">
+  <!-- Header del juego - NUEVO DISEÑO COMPACTO -->
+  <header class="game-header-compact">
     <div class="container">
-      <div class="game-header__content">
-        <h1 class="game-title">
-          <span class="game-title__emoji" aria-hidden="true">🍎</span>
-          Tutti Frutti
-        </h1>
-        <div class="game-info">
-          <div class="player-name" id="playerName" aria-live="polite">
-            Jugador: Cargando...
-          </div>
-          <div class="players-count" id="playersCount" aria-live="polite">
-            Jugadores: 0/5
-          </div>
-          <div class="timer-display" id="timerDisplay" role="timer" aria-live="assertive">
-            Esperando...
-          </div>
-        </div>
+      <div class="header-stats">
+        <span class="app-name">🍎 TUTTI FRUTTI</span>
+        <span class="timer-compact">⏱️ <span id="timerDisplay">60s</span></span>
+        <span class="players-compact">👥 <span id="playersCount">0/5</span></span>
+        <span class="score-compact">💯 <span id="userScore">0</span></span>
       </div>
     </div>
   </header>
+  
+  <!-- Letter Display - PROMINENTE Y CENTRADA -->
+  <section class="letter-section">
+    <div class="container">
+      <div class="current-letter-display">
+        🔥 <span id="letterDisplay">?</span> 🔥
+      </div>
+      <div class="letter-label">Letra de esta ronda</div>
+    </div>
+  </section>
 
   <!-- Contenido principal -->
   <main id="main-content" class="game-main">
@@ -45,22 +45,12 @@
       <div class="status-message" id="selectedLetter" aria-live="polite">
         Esperando que comience el juego...
       </div>
-      <div id="roulette" style="display: none;" role="img" aria-label="Ruleta de letras"></div>
-
     </section>
 
     <!-- Área de juego -->
     <section class="game-area">
-      <!-- Showcase de letra seleccionada -->
-      <div class="letter-showcase">
-        <div class="letter-label">LETRA SELECCIONADA</div>
-        <div class="letter-big" id="currentLetterDisplay" 
-             role="img" 
-             aria-label="Letra actual">?</div>
-      </div>
-
-      <!-- Rejilla dinámica de categorías -->
-      <div class="categories-grid" id="categoriesGrid" role="group" aria-label="Categorías del juego">
+      <!-- Rejilla dinámica de categorías - GRID 4x3 RESPONSIVE -->
+      <div class="categories-grid-new" id="categoriesGrid" role="group" aria-label="Categorías del juego">
         <!-- Se renderiza dinámicamente con uiManager.renderCategoriesGrid -->
       </div>
     </section>
@@ -91,40 +81,54 @@
       </div>
     </section>
 
-    <!-- Controles del juego -->
-    <section class="game-controls">
-      <button id="startGameButton" 
-              class="btn btn--primary btn--lg" 
-              style="display: none;"
-              aria-describedby="start-game-help">
-        <span aria-hidden="true">🎮</span>
-        Iniciar Juego
-      </button>
-      <div id="start-game-help" class="sr-only">
-        Solo el anfitrión puede iniciar el juego
-      </div>
-      
-      <button id="spinWheelButton" 
-              class="btn btn--secondary btn--lg" 
-              style="display: none;"
-              aria-describedby="spin-wheel-help">
-
-        <span aria-hidden="true">🎰</span>
-        Girar Ruleta
-      </button>
-      <div id="spin-wheel-help" class="sr-only">
-        Gira la ruleta para seleccionar una letra
-      </div>
-      
-      <button id="submitWordButton" 
-              class="btn btn--success btn--lg" 
-              disabled
-              aria-describedby="submit-words-help">
-        <span aria-hidden="true">✅</span>
-        Enviar Palabras
-      </button>
-      <div id="submit-words-help" class="sr-only">
-        Envía tus palabras cuando hayas terminado o se acabe el tiempo
+    <!-- Controles del juego - NUEVA BARRA FIJA -->
+    <section class="game-controls-fixed">
+      <div class="container">
+        <div class="controls-row">
+          <button id="startGameButton" 
+                  class="btn btn--primary btn--lg" 
+                  style="display: none;"
+                  aria-describedby="start-game-help">
+            <span aria-hidden="true">🎮</span>
+            Iniciar Juego
+          </button>
+          <div id="start-game-help" class="sr-only">
+            Solo el anfitrión puede iniciar el juego
+          </div>
+          
+          <button id="submitWordButton" 
+                  class="btn btn--success btn--lg" 
+                  disabled
+                  aria-describedby="submit-words-help">
+            <span aria-hidden="true">🚀</span>
+            Enviar Palabras
+          </button>
+          <div id="submit-words-help" class="sr-only">
+            Envía tus palabras cuando hayas terminado o se acabe el tiempo
+          </div>
+          
+          <button id="bastaButton" 
+                  class="btn btn--accent btn--lg" 
+                  style="display: none;"
+                  aria-describedby="basta-help">
+            <span aria-hidden="true">⚡</span>
+            ¡BASTA!
+          </button>
+          <div id="basta-help" class="sr-only">
+            Termina la ronda inmediatamente cuando hayas completado todas las categorías
+          </div>
+          
+          <button id="surrenderButton" 
+                  class="btn btn--ghost btn--lg" 
+                  style="display: none;"
+                  aria-describedby="surrender-help">
+            <span aria-hidden="true">⏭️</span>
+            Rendirse
+          </button>
+          <div id="surrender-help" class="sr-only">
+            Rendirse en esta ronda
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -139,9 +143,11 @@
 
     // Referencias a elementos
     const startGameButton = document.getElementById('startGameButton');
-    const spinWheelButton = document.getElementById('spinWheelButton');
     const submitWordButton = document.getElementById('submitWordButton');
-    const playerNameElement = document.getElementById('playerName');
+    const bastaButton = document.getElementById('bastaButton');
+    const surrenderButton = document.getElementById('surrenderButton');
+    const letterDisplay = document.getElementById('letterDisplay');
+    const userScoreElement = document.getElementById('userScore');
 
     // Exponer para acceso global
     window.gameModule = {
@@ -173,9 +179,9 @@
       gameState.username = username;
       gameState.roomId = roomId;
 
-      // Mostrar nombre del jugador
-      if (playerNameElement) {
-        playerNameElement.textContent = `Jugador: ${username}`;
+      // Actualizar UI inicial
+      if (userScoreElement) {
+        userScoreElement.textContent = '0';
       }
 
       // Inicializar componentes
@@ -206,28 +212,47 @@
     }
 
     function setupEventListeners() {
-      // Botón iniciar juego
+      // Botón iniciar juego - NUEVO FLUJO: Auto-letter inmediata
       startGameButton?.addEventListener('click', () => {
         if (gameState.isHost) {
+          startGameButton.disabled = true;
+          startGameButton.innerHTML = '<span class="spinner"></span> Iniciando...';
           socketManager.startGame(gameState.roomId);
+          showNotification('¡Iniciando juego con letra automática!', 'info');
         } else {
           showNotification('Solo el anfitrión puede iniciar el juego', 'warning');
         }
       });
 
-      // Botón girar ruleta
-      spinWheelButton?.addEventListener('click', () => {
-        if (gameState.isHost && gameState.gameStarted) {
-          socketManager.spinRoulette(gameState.roomId);
-        } else if (!gameState.gameStarted) {
-          showNotification('El juego aún no ha comenzado', 'warning');
-        } else {
-          showNotification('Solo el anfitrión puede girar la ruleta', 'warning');
-        }
-      });
-
       // Botón enviar palabras
       submitWordButton?.addEventListener('click', submitWordsClassic);
+      
+      // Botón ¡BASTA! - Termina la ronda inmediatamente
+      bastaButton?.addEventListener('click', () => {
+        console.log('🔥 ¡BASTA! presionado - terminando ronda inmediatamente');
+        
+        // Enviar palabras y forzar fin de ronda
+        submitWordsClassic();
+        
+        // Notificar al servidor que se terminó la ronda
+        socketManager.emit('forceEndRound', { 
+          roomId: gameState.roomId,
+          playerName: gameState.username 
+        });
+        
+        showNotification('¡Has terminado la ronda!', 'success');
+        
+        // Ocultar botón después de usar
+        bastaButton.style.display = 'none';
+      });
+      
+      // Botón rendirse
+      surrenderButton?.addEventListener('click', () => {
+        if (confirm('¿Estás seguro de que quieres rendirte en esta ronda?')) {
+          submitWordsClassic(); // Envía palabras actuales
+          showNotification('Te has rendido en esta ronda', 'info');
+        }
+      });
     }
 
     function attachWordInputEvents() {
@@ -248,24 +273,36 @@
           }
         });
 
-        // Validación en tiempo real
+        // Validación en tiempo real con restricción de letra
         input.addEventListener('input', function() {
           const category = this.getAttribute('data-category');
-          const word = this.value.trim();
-          const isValid = word ? validateWord(word, gameState.currentLetter) : false;
+          let word = this.value.trim();
           
-          // Actualizar visualización
-          uiManager.updateWordDisplay(category, word, isValid);
-
-          // Marcar tarjeta completada si tiene contenido
-          const card = this.closest('.category-card');
-          if (card) {
-            if (word.length > 0) {
-              card.classList.add('completed');
-            } else {
-              card.classList.remove('completed');
+          // NUEVA VALIDACIÓN: Bloquear primera letra incorrecta
+          if (word.length > 0 && gameState.currentLetter) {
+            const firstChar = normalizeFirstLetter(word.charAt(0));
+            const targetLetter = gameState.currentLetter.toUpperCase();
+            
+            if (firstChar !== targetLetter) {
+              // Bloquear entrada - remover último carácter
+              this.value = word.slice(0, -1);
+              word = this.value.trim();
+              
+              // Feedback visual de error
+              this.classList.add('blocked');
+              setTimeout(() => this.classList.remove('blocked'), 200);
+              
+              // Mostrar mensaje de error temporal
+              showTemporaryError(this, `Debe empezar con "${targetLetter}"`);
+              return;
             }
           }
+          
+          // No validar automáticamente - la validación se hace en revisión social
+          const hasContent = word && word.length > 0;
+          
+          // Actualizar visualización sin validación automática
+          updateCategoryCardState(this, category, word, hasContent);
           
           // Verificar si todas las palabras están completas
           checkAllWordsCompleted();
@@ -291,31 +328,23 @@
       // Estado de la sala
       socketManager.on(SOCKET_EVENTS.ROOM_STATE, handleRoomState);
       
-      // Juego
-      socketManager.on(SOCKET_EVENTS.SHOW_ROULETTE, handleShowRoulette);
-      socketManager.on(SOCKET_EVENTS.ROULETTE_SPINNING, handleRouletteSpinning);
-      socketManager.on(SOCKET_EVENTS.ROULETTE_RESULT, handleRouletteResult);
+      // Juego - NUEVO FLUJO: Solo ROUND_START
+      socketManager.on(SOCKET_EVENTS.ROUND_START, handleRoundStart);
+      socketManager.on(SOCKET_EVENTS.START_REVIEW, handleStartReview);
       socketManager.on(SOCKET_EVENTS.TIMER_UPDATE, handleTimerUpdate);
       socketManager.on(SOCKET_EVENTS.ROUND_ENDED, handleRoundEnded);
       socketManager.on(SOCKET_EVENTS.GAME_ENDED, handleGameEnded);
 
-      // Nuevos eventos (flujo sin ruleta)
-      socketManager.on(SOCKET_EVENTS.ROUND_START, handleRoundStart);
-      socketManager.on(SOCKET_EVENTS.START_REVIEW, handleStartReview);
+      // Eventos futuros (validación social)
+      // Ya configurado arriba
       socketManager.on(SOCKET_EVENTS.VOTE_UPDATE, handleVoteUpdate);
       socketManager.on(SOCKET_EVENTS.REVIEW_ENDED, handleReviewEnded);
 
-      // Alineación con eventos adicionales
+      // Eventos de host
       socketManager.on(SOCKET_EVENTS.YOU_ARE_CREATOR, () => {
         gameState.setHost(true);
         const startButton = document.getElementById('startGameButton');
         if (startButton) startButton.style.display = 'block';
-      });
-      socketManager.on(SOCKET_EVENTS.NEW_ROUND, (data) => {
-        // Preparar UI para nueva ronda, letra y temporizador provendrán del servidor
-        gameState.currentRound = data.round;
-        document.getElementById('selectedLetter').textContent = 'Nueva ronda. Esperando ruleta...';
-        uiManager.showRoulette();
       });
     }
 
@@ -338,29 +367,19 @@
       
       console.log(`Jugador actual: ${gameState.username}, Es creador: ${isCreator}`);
       
-      // Si el juego está en curso pero aún no hay letra (venimos redirigidos tras SHOW_ROULETTE),
-      // debemos mostrar la ruleta y el botón de girar (habilitado solo para host)
+      // NUEVO FLUJO: Sin ruleta, directo a juego si está en curso
       if (data.isPlaying) {
         gameState.startGame();
         if (data.currentLetter) {
-          // Juego en curso con letra definida: renderizar categorías y habilitar inputs
+          // Juego en curso con letra: renderizar categorías y mostrar letra
+          displayCurrentLetter(data.currentLetter);
           uiManager.renderCategoriesGrid(data.categories || GAME_CONFIG.CATEGORIES);
           attachWordInputEvents();
           gameState.setCurrentLetter(data.currentLetter);
+          document.getElementById('selectedLetter').textContent = `¡Escribiendo con la letra ${data.currentLetter}!`;
         } else {
-          // Juego en curso sin letra aún: mostrar ruleta y botón de girar
-          gameState.disableInputs();
-          uiManager.showRoulette();
-          if (spinWheelButton) {
-            spinWheelButton.style.display = 'block';
-            spinWheelButton.disabled = !isCreator;
-            spinWheelButton.innerHTML = isCreator
-              ? '<span aria-hidden="true">🎰</span> Girar Ruleta'
-              : '<span aria-hidden="true">⏳</span> Esperando al anfitrión';
-          }
-          document.getElementById('selectedLetter').textContent = isCreator
-            ? '¡Haz clic en "Girar Ruleta" para comenzar!'
-            : 'Esperando que el anfitrión gire la ruleta...';
+          // Juego en curso sin letra: estado transitorio, esperar ROUND_START
+          document.getElementById('selectedLetter').textContent = 'Generando letra automática...';
         }
         if (startGameButton) startGameButton.style.display = 'none';
       } else if (isCreator) {
@@ -368,7 +387,10 @@
         if (startGameButton) {
           startGameButton.style.display = 'block';
         }
+        document.getElementById('selectedLetter').textContent = '¡Haz clic en "Iniciar Juego" para comenzar!';
         uiManager.announce('Eres el anfitrión. Puedes iniciar el juego cuando estés listo.');
+      } else {
+        document.getElementById('selectedLetter').textContent = 'Esperando que el anfitrión inicie el juego...';
       }
       
       uiManager.announce(`Estado del juego cargado. ${data.players.length} jugadores en la sala.`);
@@ -421,108 +443,161 @@
       }
     }
 
-function handleShowRoulette(data) {
-      console.log('Mostrando ruleta:', data);
-      
-      gameState.startGame();
-      // Mientras se muestra la ruleta nadie debería escribir
-      gameState.disableInputs();
-      uiManager.showRoulette();
-      
-      // Mostrar SIEMPRE el botón de girar para evitar condiciones de carrera,
-      // deshabilitado para no‑host. El servidor valida permisos igualmente.
-      if (spinWheelButton) {
-        spinWheelButton.style.display = 'block';
-        const isHost = !!gameState.isHost;
-        spinWheelButton.disabled = !isHost;
-        spinWheelButton.innerHTML = isHost
-          ? '<span aria-hidden="true">🎰</span> Girar Ruleta'
-          : '<span aria-hidden="true">⏳</span> Esperando al anfitrión';
+    // NUEVA FUNCIÓN: Mostrar letra en header compacto
+    function displayCurrentLetter(letter) {
+      if (letterDisplay) {
+        letterDisplay.textContent = letter;
       }
-      document.getElementById('selectedLetter').textContent = gameState.isHost
-        ? '¡Haz clic en "Girar Ruleta" para comenzar!'
-        : 'Esperando que el anfitrión gire la ruleta...';
-      
-      if (startGameButton) startGameButton.style.display = 'none';
-      uiManager.announce('El juego ha comenzado. Esperando que se gire la ruleta.');
+      // También actualizar en el panel de estado
+      const statusMessage = document.getElementById('selectedLetter');
+      if (statusMessage) {
+        statusMessage.textContent = `¡Escribiendo con la letra ${letter}!`;
+      }
+      uiManager.announce(`Letra seleccionada: ${letter}. ¡A escribir!`);
     }
 
-    function handleRouletteSpinning() {
-      console.log('La ruleta está girando...');
-      
-      // Deshabilitar botón de girar
-      if (spinWheelButton) {
-        spinWheelButton.disabled = true;
-        spinWheelButton.innerHTML = '<span class="spinner"></span> Girando...';
-      }
-      
-      // Mostrar animación
-      uiManager.animateRouletteSpinning();
-      
-      document.getElementById('selectedLetter').textContent = '🎰 La ruleta está girando...';
-      uiManager.announce('La ruleta está girando...');
+    // FUNCIÓN: Normalizar primera letra (tildes + Ñ)
+    function normalizeFirstLetter(char) {
+      const normalized = char.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return normalized.toUpperCase();
     }
 
-    function handleRouletteResult(data) {
-      console.log('[Game] handleRouletteResult ->', data);
-
-      // Mantener la ruleta visible y girarla exactamente a la letra enviada
-      if (typeof uiManager.spinToLetter === 'function') {
-        uiManager.spinToLetter(data.letter);
-      }
-
-      // Ocultar botón de girar para todos
-      if (spinWheelButton) {
-        spinWheelButton.style.display = 'none';
-      }
-
-      // Tras la animación, mostrar letra grande y habilitar inputs para todos
+    // FUNCIÓN: Mostrar error temporal en input
+    function showTemporaryError(input, message) {
+      const card = input.closest('.category-card');
+      if (!card) return;
+      
+      // Crear elemento de error temporal
+      const errorEl = document.createElement('div');
+      errorEl.className = 'temp-error';
+      errorEl.textContent = message;
+      errorEl.style.cssText = `
+        position: absolute;
+        top: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--color-error);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 1000;
+        animation: errorPulse 2s ease-out forwards;
+      `;
+      
+      card.style.position = 'relative';
+      card.appendChild(errorEl);
+      
       setTimeout(() => {
-        uiManager.hideRoulette();
-        uiManager.displaySelectedLetter(data.letter);
-
-        // Render dinámico de categorías y habilitar inputs (compatibilidad con flujo nuevo)
-        uiManager.renderCategoriesGrid(GAME_CONFIG.CATEGORIES);
-        attachWordInputEvents();
-        gameState.setCurrentLetter(data.letter);
-        gameState.enableInputs();
-      }, 1200);
+        if (errorEl.parentNode) {
+          errorEl.parentNode.removeChild(errorEl);
+        }
+      }, 2000);
     }
 
-    // Nuevo flujo sin ruleta
+    // FUNCIÓN: Actualizar estado visual de categoria card (SIN validación automática)
+    function updateCategoryCardState(input, category, word, hasContent) {
+      const card = input.closest('.category-card');
+      if (!card) return;
+      
+      // Limpiar clases previas
+      card.classList.remove('completed', 'invalid', 'empty', 'filled');
+      input.classList.remove('valid', 'invalid', 'filled');
+      
+      if (hasContent) {
+        // Solo marcar como "filled" sin validar
+        card.classList.add('filled');
+        input.classList.add('filled');
+      } else {
+        card.classList.add('empty');
+      }
+      
+      // Actualizar feedback visual sin validación
+      updateCategoryFeedback(card, word, hasContent);
+    }
+
+    // FUNCIÓN: Feedback visual en categoria card (SIN validación automática)
+    function updateCategoryFeedback(card, word, hasContent) {
+      let feedbackEl = card.querySelector('.category-card__feedback');
+      
+      if (hasContent) {
+        if (!feedbackEl) {
+          feedbackEl = document.createElement('div');
+          feedbackEl.className = 'category-card__feedback';
+          card.appendChild(feedbackEl);
+        }
+        
+        // Solo mostrar que tiene contenido, sin validar
+        feedbackEl.className = 'category-card__feedback filled';
+        feedbackEl.textContent = '📝';
+        feedbackEl.setAttribute('aria-label', 'Palabra ingresada');
+      } else if (feedbackEl) {
+        feedbackEl.remove();
+      }
+    }
+
+    // NUEVO FLUJO: Round start con auto-letter inmediata
     function handleRoundStart(data) {
       try {
+        console.log('[Game] handleRoundStart - NUEVO FLUJO:', data);
+        
         const categories = data?.categories || GAME_CONFIG.CATEGORIES;
-        // Ocultar cualquier ruleta legacy
-        uiManager.hideRoulette();
-        // Render de categorías dinámicas
+        
+        // Ocultar botón de iniciar juego
+        if (startGameButton) startGameButton.style.display = 'none';
+        
+        // Mostrar letra en header compacto
+        displayCurrentLetter(data.letter);
+        
+        // Render de categorías dinámicas en grid 4x3
         uiManager.renderCategoriesGrid(categories);
         attachWordInputEvents();
-        // Mostrar letra y habilitar inputs
-        uiManager.displaySelectedLetter(data.letter);
+        
+        // Configurar estado del juego
         gameState.setCurrentLetter(data.letter);
         gameState.enableInputs();
+        gameState.startGame();
 
-        // Enfocar primer input disponible
-        const first = document.querySelector('.word-input:not([disabled])');
-        if (first) { try { first.focus(); } catch(_) {} }
+        // Mostrar botón de rendirse durante el juego
+        if (surrenderButton) {
+          surrenderButton.style.display = 'inline-block';
+        }
 
-        // Mensaje accesible
-        document.getElementById('selectedLetter').textContent = `Letra seleccionada: ${data.letter}. ¡A escribir!`;
+        // Enfocar primer input disponible para UX
+        setTimeout(() => {
+          const first = document.querySelector('.word-input:not([disabled])');
+          if (first) { 
+            try { first.focus(); } catch(_) {} 
+          }
+        }, 100);
+
+        showNotification(`¡Ronda ${data.round} iniciada con letra ${data.letter}!`, 'success');
+        uiManager.announce(`Ronda ${data.round} iniciada con letra ${data.letter}. ¡Tiempo para escribir!`);
       } catch (e) {
         console.error('Error en handleRoundStart:', e);
+        showNotification('Error al iniciar la ronda', 'error');
       }
     }
 
     function handleStartReview(data) {
       try {
+        console.log('[Game] Iniciando revisión social:', data);
+        
         // Bloquear entradas y botón de enviar
         gameState.disableInputs();
         if (submitWordButton) submitWordButton.disabled = true;
-        // Abrir modal de revisión
-        uiManager.openReviewModal(data, { isHost: !!gameState.isHost });
+        
+        // Mostrar notificación de transición
+        showNotification(data.message || '¡Hora de revisar las palabras!', 'info');
+        
+        // Redireccionar a la página de revisión después de un breve delay
+        setTimeout(() => {
+          window.location.href = data.reviewUrl || `${ROUTES.REVIEW}?roomId=${gameState.roomId}`;
+        }, 2000);
+        
       } catch (e) {
         console.error('Error en handleStartReview:', e);
+        showNotification('Error al iniciar la revisión', 'error');
       }
     }
 
@@ -604,7 +679,7 @@ function handleShowRoulette(data) {
 
     function checkAllWordsCompleted() {
       const wordInputs = document.querySelectorAll('.word-input');
-      const allCompleted = Array.from(wordInputs).every(input => 
+      const allFilledBasic = Array.from(wordInputs).every(input => 
         input.disabled || input.value.trim().length > 0
       );
       
@@ -613,8 +688,29 @@ function handleShowRoulette(data) {
         !input.disabled && input.value.trim().length > 0
       );
       
+      // Verificar si TODAS las categorías están completas para mostrar ¡BASTA!
+      const allCompleted = Array.from(wordInputs).every(input => {
+        if (input.disabled) return true; // Ignorar inputs deshabilitados
+        const word = input.value.trim();
+        const letter = gameState.currentLetter;
+        
+        // Debe tener contenido Y empezar con la letra correcta
+        return word.length > 0 && word.charAt(0).toUpperCase() === letter;
+      });
+      
       if (submitWordButton) {
         submitWordButton.disabled = !anyCompleted;
+      }
+      
+      // Mostrar botón ¡BASTA! solo si TODO está completo
+      if (bastaButton) {
+        if (allCompleted && gameState.isPlaying && gameState.currentLetter) {
+          bastaButton.style.display = 'inline-block';
+          bastaButton.classList.add('btn--pulse'); // Efecto visual
+        } else {
+          bastaButton.style.display = 'none';
+          bastaButton.classList.remove('btn--pulse');
+        }
       }
     }
 

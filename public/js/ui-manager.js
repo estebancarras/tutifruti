@@ -108,11 +108,12 @@ class UIManager {
   }
 
   /**
-   * Actualiza la visualización de la letra seleccionada
+   * Actualiza la visualización de la letra seleccionada - NUEVO HEADER COMPACTO
    * @param {string} letter - Letra seleccionada
    */
   displaySelectedLetter(letter) {
-    const letterDisplay = document.getElementById('currentLetterDisplay');
+    // Actualizar en header compacto
+    const letterDisplay = document.getElementById('letterDisplay');
     const statusMessage = document.getElementById('selectedLetter');
     
     if (letterDisplay) {
@@ -121,22 +122,18 @@ class UIManager {
     }
     
     if (statusMessage) {
-      statusMessage.textContent = `¡Letra seleccionada: ${letter}! Completa las categorías.`;
+      statusMessage.textContent = `¡Escribiendo con letra ${letter}!`;
     }
 
-    this.announce(`Letra seleccionada: ${letter}. Tiempo para completar las categorías.`);
+    this.announce(`Letra seleccionada: ${letter}. ¡Tiempo para escribir!`);
   }
 
   /**
-   * Muestra la ruleta
+   * ELIMINADO: showRoulette - ya no se usa ruleta
    */
   showRoulette() {
-    const roulette = document.getElementById('roulette');
-    if (roulette) {
-      roulette.style.display = 'block';
-      roulette.innerHTML = this.generateRouletteHTML();
-      roulette.setAttribute('aria-label', 'Ruleta de letras');
-    }
+    // NOOP - Ya no se usa ruleta en el nuevo flujo
+    console.log('[UIManager] showRoulette llamado pero ignorado - nuevo flujo sin ruleta');
   }
 
   /**
@@ -226,13 +223,11 @@ class UIManager {
   }
 
   /**
-   * Oculta la ruleta
+   * ELIMINADO: hideRoulette - ya no se usa ruleta
    */
   hideRoulette() {
-    const roulette = document.getElementById('roulette');
-    if (roulette) {
-      roulette.style.display = 'none';
-    }
+    // NOOP - Ya no se usa ruleta en el nuevo flujo
+    console.log('[UIManager] hideRoulette llamado pero ignorado - nuevo flujo sin ruleta');
   }
 
   /**

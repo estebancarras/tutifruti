@@ -105,7 +105,7 @@ app.use('/views', express.static(__dirname + '/views'));
 app.use('/', express.static(__dirname)); // raíz para index.html
 
 // Ruta explícita para vistas HTML para evitar duplicaciones o 404
-app.get(['/views/create-room.html', '/views/join-room.html', '/views/game.html'], (req, res) => {
+app.get(['/views/create-room.html', '/views/join-room.html', '/views/game.html', '/views/review.html', '/views/results.html'], (req, res) => {
   res.sendFile(__dirname + req.path);
 });
 
@@ -128,8 +128,8 @@ const createGameState = (roomId, maxPlayers = 5) => {
     isPlaying: false,
     currentRound: 0,
     currentLetter: '',
-    // Categorías ampliadas (10) – se pueden hacer configurables por sala en el futuro
-    categories: ['NOMBRE', 'ANIMAL', 'COSA', 'FRUTA', 'PAIS', 'COLOR', 'COMIDA', 'CIUDAD', 'PROFESION', 'MARCA'],
+    // Categorías expandidas para grid 4x3 (12 total) – configurables por sala en el futuro
+    categories: ['NOMBRE', 'ANIMAL', 'COSA', 'FRUTA', 'PAIS', 'COLOR', 'COMIDA', 'CIUDAD', 'PROFESION', 'MARCA', 'DEPORTE', 'PELICULA'],
     gameMode: 'classic', // Modo de juego clásico
     timeLimit: 60,
     timeRemaining: 60,
@@ -147,9 +147,7 @@ const createGameState = (roomId, maxPlayers = 5) => {
     creator: null,
     private: false,
     password: null,
-    // Props legacy para compatibilidad con UI anterior
-    rouletteSpinning: false,
-    showRoulette: false
+    // Props legacy eliminadas - no más ruleta
   };
 };
 
@@ -394,7 +392,7 @@ io.on('connection', (socket) => {
     logEvent({ socket, event: 'joinRoom', roomId, message: `${playerName} unido` });
   });
 
-  // Iniciar el juego - flujo legacy: mostrar ruleta y esperar spinRoulette
+  // Iniciar el juego - NUEVO FLUJO: auto-letter inmediata sin ruleta
   socket.on('startGame', () => {
     const roomId = socket.roomId;
     const gameState = gameStates[roomId];
@@ -407,32 +405,16 @@ io.on('connection', (socket) => {
       return socket.emit('error', { message: 'Solo el creador puede iniciar el juego' });
     }
     
-    // Iniciar juego mostrando ruleta (sin seleccionar letra aún)
+    // NUEVA LÓGICA: Auto-letter generación inmediata
     gameState.isPlaying = true;
     gameState.currentRound = 1;
-    gameState.roundPhase = 'roundStart';
-    gameState.showRoulette = true;
-
-    io.to(roomId).emit('showRoulette');
-    logEvent({ socket, event: 'startGame', roomId, message: 'Juego iniciado - mostrar ruleta' });
-  });
-
-  // Girar la ruleta (legacy): compatibilidad, inicia una nueva letra si es host
-  socket.on('spinRoulette', () => {
-    const roomId = socket.roomId;
-    const gameState = gameStates[roomId];
-    if (!gameState || !gameState.isPlaying) return;
-    const player = gameState.players.find(p => p.id === socket.id);
-    if (!player || !player.isCreator) {
-      return socket.emit('error', { message: 'Solo el creador puede iniciar la ronda' });
-    }
-    // Si ya estamos escribiendo, ignorar
-    if (gameState.roundPhase === 'writing') return;
+    gameState.roundPhase = 'writing';
     
-    gameState.roundPhase = 'roundStart';
+    // Generar letra aleatoria inmediatamente
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
     
+    // Emit directo sin ruleta - ROUNDSTART inmediato
     io.to(roomId).emit('roundStart', {
       letter: gameState.currentLetter,
       timeLimit: gameState.timeLimit,
@@ -440,17 +422,13 @@ io.on('connection', (socket) => {
       categories: gameState.categories
     });
     
-    // Compatibilidad legacy
-    io.to(roomId).emit('rouletteResult', {
-      letter: gameState.currentLetter,
-      timeLimit: gameState.timeLimit,
-      round: gameState.currentRound
-    });
-    
-    gameState.roundPhase = 'writing';
+    // Iniciar temporizador inmediatamente
     setTimeout(() => startTimer(roomId), 500);
-    logEvent({ socket, event: 'spinRoulette', roomId, message: `Inicio de ronda con letra ${gameState.currentLetter}` });
+    
+    logEvent({ socket, event: 'startGame', roomId, message: `Juego iniciado con letra ${gameState.currentLetter}` });
   });
+
+  // ELIMINADO: spinRoulette ya no es necesario - auto-letter en startGame
 
   // Enviar todas las palabras de la tabla - FORMATO CLÁSICO
   socket.on('submitWords', ({ roomId, playerName, words }) => {
@@ -513,42 +491,76 @@ io.on('connection', (socket) => {
         gameState.timer = null;
       }
       
-      // Calcular puntuaciones usando el sistema clásico (flujo legacy directo)
-      const scores = calculateClassicScores(gameState);
+      // NUEVA LÓGICA: Iniciar fase de revisión social
+      gameState.roundPhase = 'review';
+      gameState.timerEndsAt = null;
       
-      // Actualizar puntuaciones acumuladas
-      Object.keys(scores).forEach(player => {
-        const idx = gameState.players.findIndex(p => p.name === player);
-        if (idx !== -1) {
-          gameState.players[idx].score += scores[player].total;
-        }
-      });
-      
-      // Notificar fin de ronda
-      io.to(roomId).emit('roundEnded', {
-        scores,
-        words: gameState.words,
-        validWords: gameState.validWords,
-        playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
-        letter: gameState.currentLetter
-      });
-      
-      // ¿Fin de juego o siguiente ronda?
-      const isLastRound = (gameState.maxRounds && gameState.currentRound >= gameState.maxRounds);
-      if (isLastRound) {
-        endGame(roomId);
-      } else {
-        // Preparar siguiente ronda
-        gameState.words = {};
-        gameState.validWords = {};
-        gameState.currentRound++;
-        gameState.timeRemaining = gameState.timeLimit;
-        gameState.showRoulette = true;
-        // El frontend legacy mostrará la ruleta al próximo startGame/spinRoulette
+      // Configurar datos de revisión
+      if (!gameState.reviewData) {
+        gameState.reviewData = {
+          votes: {},
+          currentPlayerIndex: 0,
+          reviewPhase: 'voting',
+          consensusReached: {},
+          timeRemaining: 60,
+          reviewStartedAt: Date.now()
+        };
       }
+      
+      // Encontrar el primer jugador con palabras para comenzar
+      let startPlayerIndex = 0;
+      for (let i = 0; i < gameState.players.length; i++) {
+        const player = gameState.players[i];
+        if (gameState.words[player.id] && Object.keys(gameState.words[player.id]).length > 0) {
+          startPlayerIndex = i;
+          break;
+        }
+      }
+      gameState.reviewData.currentPlayerIndex = startPlayerIndex;
+      
+      // Notificar a todos los clientes que comienza la revisión
+      io.to(roomId).emit('startReview', {
+        round: gameState.currentRound,
+        letter: gameState.currentLetter,
+        message: '¡Hora de revisar las palabras! Redirigiéndote...',
+        reviewUrl: `/views/review.html?roomId=${roomId}`
+      });
+      
+      logEvent({ event: 'startReview', roomId, message: `Iniciada revisión para ronda ${gameState.currentRound}` });
+      
+      // La lógica de fin de juego/siguiente ronda ahora se maneja después de la revisión social
+      // Todo el flujo continúa desde finishReview() después de la votación
     }
     
     logEvent({ socket, event: 'submitWords', roomId, message: `${playerName} envió sus palabras` });
+  });
+
+  // Forzar fin de ronda cuando alguien presiona ¡BASTA!
+  socket.on('forceEndRound', ({ roomId, playerName }) => {
+    const gameState = gameStates[roomId];
+    if (!gameState || !gameState.isPlaying) return;
+
+    console.log(`🔥 ${playerName} presionó ¡BASTA! - forzando fin de ronda`);
+    
+    // Limpiar temporizador inmediatamente
+    if (gameState.timer) {
+      clearInterval(gameState.timer);
+      gameState.timer = null;
+    }
+    
+    // Configurar para iniciar revisión inmediatamente
+    gameState.roundPhase = 'review';
+    gameState.timerEndsAt = null;
+    
+    // Notificar a todos los clientes que comienza la revisión
+    io.to(roomId).emit('startReview', {
+      round: gameState.currentRound,
+      letter: gameState.currentLetter,
+      message: `¡${playerName} ha terminado! Iniciando revisión...`,
+      reviewUrl: `${ROUTES.REVIEW}?roomId=${roomId}`
+    });
+    
+    logEvent({ socket, event: 'forceEndRound', roomId, message: `${playerName} forzó fin de ronda` });
   });
 
   // Marcar jugador como listo para la siguiente ronda
@@ -731,6 +743,240 @@ io.on('connection', (socket) => {
     gameState.roundPhase = 'writing';
     setTimeout(() => startTimer(roomId), 500);
   });
+
+  // =============================================
+  // SISTEMA DE REVISIÓN SOCIAL Y VOTACIÓN
+  // =============================================
+
+  // Unirse a sala de revisión
+  socket.on('joinReviewRoom', ({ roomId }) => {
+    try {
+      const gameState = gameStates[roomId];
+      if (!gameState) {
+        return socket.emit('reviewError', { message: 'Sala no encontrada' });
+      }
+
+      const player = gameState.players.find(p => p.id === socket.id);
+      if (!player) {
+        return socket.emit('reviewError', { message: 'Jugador no encontrado en la sala' });
+      }
+
+      // Unirse a sala de revisión
+      socket.join(`${roomId}-review`);
+
+      // Preparar datos de revisión si no existen
+      if (!gameState.reviewData) {
+        gameState.reviewData = {
+          votes: {}, // { wordId: { playerId: 'approve'|'reject' } }
+          currentPlayerIndex: 0,
+          reviewPhase: 'voting', // voting | results
+          consensusReached: {},
+          timeRemaining: 60,
+          reviewStartedAt: Date.now()
+        };
+      }
+
+      // Enviar datos de revisión al cliente
+      socket.emit('reviewData', {
+        roomId,
+        round: gameState.currentRound,
+        letter: gameState.currentLetter,
+        players: gameState.players,
+        allWords: gameState.words,
+        votes: gameState.reviewData.votes,
+        currentPlayerIndex: gameState.reviewData.currentPlayerIndex,
+        timeRemaining: gameState.reviewData.timeRemaining,
+        phase: gameState.reviewData.reviewPhase,
+        stats: calculateReviewStats(gameState)
+      });
+
+      logEvent({ socket, event: 'joinReviewRoom', roomId, message: `${player.name} se unió a revisión` });
+    } catch (error) {
+      console.error('[ReviewRoom] Error:', error);
+      socket.emit('reviewError', { message: 'Error interno del servidor' });
+    }
+  });
+
+  // Votar en revisión social
+  socket.on('castVote', ({ roomId, wordId, vote }) => {
+    try {
+      // Rate limiting
+      if (!checkRateLimit(socket, 'castVote', 2000)) {
+        logEvent({ socket, event: 'castVote', level: 'warn', message: 'Rate limit' });
+        return socket.emit('reviewError', { message: 'Demasiados votos. Espera un momento.' });
+      }
+
+      const gameState = gameStates[roomId];
+      if (!gameState || !gameState.reviewData) {
+        return socket.emit('reviewError', { message: 'Revisión no disponible' });
+      }
+
+      const player = gameState.players.find(p => p.id === socket.id);
+      if (!player) {
+        return socket.emit('reviewError', { message: 'Jugador no encontrado' });
+      }
+
+      // Validar voto
+      if (!['approve', 'reject'].includes(vote)) {
+        return socket.emit('reviewError', { message: 'Voto inválido' });
+      }
+
+      // Verificar que no sea su propia palabra
+      const [wordOwnerId] = wordId.split('-');
+      if (wordOwnerId === player.id) {
+        return socket.emit('reviewError', { message: 'No puedes votar tu propia palabra' });
+      }
+
+      // Inicializar estructura de votos si no existe
+      if (!gameState.reviewData.votes[wordId]) {
+        gameState.reviewData.votes[wordId] = {};
+      }
+
+      // Registrar o actualizar voto
+      gameState.reviewData.votes[wordId][player.id] = vote;
+
+      // Calcular estadísticas de la palabra
+      const wordStats = calculateWordVoteStats(gameState.reviewData.votes[wordId]);
+      
+      // Verificar si se alcanzó consenso
+      let consensus = null;
+      const totalVoters = gameState.players.length - 1; // Excluir al dueño de la palabra
+      const minVotesForConsensus = Math.max(2, Math.ceil(totalVoters * 0.5));
+      
+      if (wordStats.totalVotes >= minVotesForConsensus) {
+        const approvalRate = wordStats.approvals / wordStats.totalVotes;
+        const rejectionRate = wordStats.rejections / wordStats.totalVotes;
+        
+        if (approvalRate >= 0.6) {
+          consensus = 'approve';
+        } else if (rejectionRate >= 0.6) {
+          consensus = 'reject';
+        }
+      }
+
+      // Si hay consenso, marcarlo
+      if (consensus) {
+        gameState.reviewData.consensusReached[wordId] = consensus;
+      }
+
+      // Broadcast actualización de voto
+      io.to(`${roomId}-review`).emit('voteUpdate', {
+        wordId,
+        playerId: player.id,
+        vote,
+        wordStats,
+        consensus,
+        timestamp: Date.now()
+      });
+
+      // Verificar si todos han terminado de votar al jugador actual
+      const currentPlayer = gameState.players[gameState.reviewData.currentPlayerIndex];
+      if (currentPlayer && hasAllPlayersVotedForPlayer(gameState, currentPlayer.id)) {
+        // Avanzar al siguiente jugador automáticamente después de un delay
+        setTimeout(() => {
+          advanceToNextPlayer(roomId);
+        }, 2000);
+      }
+
+      logEvent({ socket, event: 'castVote', roomId, message: `${player.name} votó ${vote} en ${wordId}` });
+    } catch (error) {
+      console.error('[CastVote] Error:', error);
+      socket.emit('reviewError', { message: 'Error procesando voto' });
+    }
+  });
+
+  // Saltar jugador actual (solo host)
+  socket.on('skipCurrentPlayer', ({ roomId }) => {
+    try {
+      const gameState = gameStates[roomId];
+      if (!gameState || !gameState.reviewData) return;
+
+      const player = gameState.players.find(p => p.id === socket.id);
+      if (!player?.isCreator) {
+        return socket.emit('reviewError', { message: 'Solo el host puede saltar jugadores' });
+      }
+
+      advanceToNextPlayer(roomId);
+    } catch (error) {
+      console.error('[SkipCurrentPlayer] Error:', error);
+    }
+  });
+
+  // Finalizar revisión (solo host)
+  socket.on('finishReview', ({ roomId }) => {
+    try {
+      const gameState = gameStates[roomId];
+      if (!gameState || !gameState.reviewData) return;
+
+      const player = gameState.players.find(p => p.id === socket.id);
+      if (!player?.isCreator) {
+        return socket.emit('reviewError', { message: 'Solo el host puede finalizar la revisión' });
+      }
+
+      // Procesar resultados finales
+      const finalResults = processFinalReviewResults(gameState);
+      
+      // Actualizar puntuaciones
+      updatePlayerScoresFromReview(gameState, finalResults);
+
+      // Notificar fin de revisión
+      io.to(`${roomId}-review`).emit('reviewEnded', {
+        finalResults,
+        playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
+        round: gameState.currentRound
+      });
+
+      // Determinar si es la última ronda
+      const isLastRound = (gameState.maxRounds && gameState.currentRound >= gameState.maxRounds);
+      
+      if (isLastRound) {
+        // Finalizar juego
+        gameState.isPlaying = false;
+        gameState.roundPhase = 'ended';
+        
+        io.to(roomId).emit('gameEnded', {
+          finalResults,
+          playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })).sort((a, b) => b.score - a.score),
+          totalRounds: gameState.currentRound
+        });
+        
+        logEvent({ socket, event: 'gameEnded', roomId, message: `Juego finalizado después de ${gameState.currentRound} rondas` });
+      } else {
+        // Preparar siguiente ronda
+        gameState.words = {};
+        gameState.validWords = {};
+        gameState.currentRound++;
+        gameState.timeRemaining = gameState.timeLimit;
+        gameState.roundPhase = 'roundStart';
+        
+        // Auto-generar nueva letra
+        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+        
+        // Notificar nueva ronda después de un breve delay
+        setTimeout(() => {
+          io.to(roomId).emit('roundStart', {
+            letter: gameState.currentLetter,
+            timeLimit: gameState.timeLimit,
+            round: gameState.currentRound,
+            categories: gameState.categories
+          });
+          
+          gameState.roundPhase = 'writing';
+          setTimeout(() => startTimer(roomId), 500);
+        }, 3000); // 3 segundos para que vean los resultados
+        
+        logEvent({ socket, event: 'nextRoundStarted', roomId, message: `Iniciando ronda ${gameState.currentRound} con letra ${gameState.currentLetter}` });
+      }
+
+      // Limpiar datos de revisión
+      delete gameState.reviewData;
+
+      logEvent({ socket, event: 'finishReview', roomId, message: `Revisión finalizada por ${player.name}` });
+    } catch (error) {
+      console.error('[FinishReview] Error:', error);
+    }
+  });
   
   // Manejar desconexión
   socket.on('disconnect', () => {
@@ -896,7 +1142,22 @@ function startTimer(roomId) {
           gameState.currentRound++;
           gameState.timeRemaining = gameState.timeLimit;
           gameState.timerEndsAt = null;
-          gameState.showRoulette = true;
+          
+          // NUEVO FLUJO: Auto-letter para siguiente ronda
+          const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+          gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+          gameState.roundPhase = 'writing';
+          
+          // Emit directo sin ruleta
+          io.to(roomId).emit('roundStart', {
+            letter: gameState.currentLetter,
+            timeLimit: gameState.timeLimit,
+            round: gameState.currentRound,
+            categories: gameState.categories
+          });
+          
+          // Iniciar temporizador
+          setTimeout(() => startTimer(roomId), 1000);
         }
       } else {
         gameState.timerEndsAt = null;
@@ -991,6 +1252,288 @@ function countSyllables(word) {
   }
   
   return syllables || 1; // Mínimo 1 sílaba
+}
+
+// =============================================
+// FUNCIONES AUXILIARES PARA REVISIÓN SOCIAL
+// =============================================
+
+/**
+ * Calcula estadísticas de votos para una palabra específica
+ */
+function calculateWordVoteStats(wordVotes) {
+  const votes = Object.values(wordVotes || {});
+  const approvals = votes.filter(v => v === 'approve').length;
+  const rejections = votes.filter(v => v === 'reject').length;
+  
+  return {
+    totalVotes: votes.length,
+    approvals,
+    rejections,
+    approvalRate: votes.length > 0 ? approvals / votes.length : 0,
+    rejectionRate: votes.length > 0 ? rejections / votes.length : 0
+  };
+}
+
+/**
+ * Calcula estadísticas generales de toda la revisión
+ */
+function calculateReviewStats(gameState) {
+  if (!gameState.reviewData) {
+    return { totalWords: 0, approvedWords: 0, rejectedWords: 0, pendingWords: 0 };
+  }
+
+  let totalWords = 0;
+  let approvedWords = 0;
+  let rejectedWords = 0;
+
+  Object.keys(gameState.words || {}).forEach(playerId => {
+    const playerWords = gameState.words[playerId] || {};
+    Object.keys(playerWords).forEach(category => {
+      totalWords++;
+      const wordId = `${playerId}-${category}`;
+      const consensus = gameState.reviewData.consensusReached[wordId];
+      
+      if (consensus === 'approve') {
+        approvedWords++;
+      } else if (consensus === 'reject') {
+        rejectedWords++;
+      }
+    });
+  });
+
+  return {
+    totalWords,
+    approvedWords,
+    rejectedWords,
+    pendingWords: totalWords - approvedWords - rejectedWords
+  };
+}
+
+/**
+ * Verifica si todos los jugadores han votado las palabras del jugador actual
+ */
+function hasAllPlayersVotedForPlayer(gameState, currentPlayerId) {
+  if (!gameState.reviewData || !gameState.words[currentPlayerId]) {
+    return false;
+  }
+
+  const playerWords = gameState.words[currentPlayerId];
+  const otherPlayers = gameState.players.filter(p => p.id !== currentPlayerId && p.connected);
+  
+  // Verificar cada palabra del jugador
+  for (const category of Object.keys(playerWords)) {
+    const wordId = `${currentPlayerId}-${category}`;
+    const wordVotes = gameState.reviewData.votes[wordId] || {};
+    
+    // Verificar si todos los otros jugadores han votado esta palabra
+    for (const player of otherPlayers) {
+      if (!wordVotes[player.id]) {
+        return false; // Este jugador no ha votado esta palabra
+      }
+    }
+  }
+  
+  return true; // Todos han votado todas las palabras
+}
+
+/**
+ * Avanza al siguiente jugador en la revisión
+ */
+function advanceToNextPlayer(roomId) {
+  const gameState = gameStates[roomId];
+  if (!gameState || !gameState.reviewData) return;
+
+  // Buscar el siguiente jugador con palabras
+  let nextIndex = gameState.reviewData.currentPlayerIndex + 1;
+  let attempts = 0;
+  
+  while (attempts < gameState.players.length) {
+    if (nextIndex >= gameState.players.length) {
+      // Todos los jugadores han sido revisados, finalizar
+      finishReviewAutomatically(roomId);
+      return;
+    }
+    
+    const nextPlayer = gameState.players[nextIndex];
+    if (nextPlayer && gameState.words[nextPlayer.id] && Object.keys(gameState.words[nextPlayer.id]).length > 0) {
+      // Jugador encontrado con palabras
+      gameState.reviewData.currentPlayerIndex = nextIndex;
+      
+      // Broadcast cambio de jugador
+      io.to(`${roomId}-review`).emit('playerChange', {
+        playerIndex: nextIndex,
+        playerId: nextPlayer.id,
+        playerName: nextPlayer.name,
+        words: gameState.words[nextPlayer.id]
+      });
+      
+      return;
+    }
+    
+    nextIndex++;
+    attempts++;
+  }
+  
+  // No se encontraron más jugadores con palabras
+  finishReviewAutomatically(roomId);
+}
+
+/**
+ * Finaliza automáticamente la revisión cuando no hay más jugadores
+ */
+function finishReviewAutomatically(roomId) {
+  const gameState = gameStates[roomId];
+  if (!gameState || !gameState.reviewData) return;
+
+  const finalResults = processFinalReviewResults(gameState);
+  updatePlayerScoresFromReview(gameState, finalResults);
+
+  io.to(`${roomId}-review`).emit('reviewEnded', {
+    finalResults,
+    playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
+    round: gameState.currentRound,
+    automatic: true
+  });
+
+  // Determinar si es la última ronda
+  const isLastRound = (gameState.maxRounds && gameState.currentRound >= gameState.maxRounds);
+  
+  if (isLastRound) {
+    // Finalizar juego
+    gameState.isPlaying = false;
+    gameState.roundPhase = 'ended';
+    
+    io.to(roomId).emit('gameEnded', {
+      finalResults,
+      playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })).sort((a, b) => b.score - a.score),
+      totalRounds: gameState.currentRound
+    });
+    
+    logEvent({ event: 'gameEnded', roomId, message: `Juego finalizado automáticamente después de ${gameState.currentRound} rondas` });
+  } else {
+    // Preparar siguiente ronda
+    gameState.words = {};
+    gameState.validWords = {};
+    gameState.currentRound++;
+    gameState.timeRemaining = gameState.timeLimit;
+    gameState.roundPhase = 'roundStart';
+    
+    // Auto-generar nueva letra
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+    
+    // Notificar nueva ronda después de un breve delay
+    setTimeout(() => {
+      io.to(roomId).emit('roundStart', {
+        letter: gameState.currentLetter,
+        timeLimit: gameState.timeLimit,
+        round: gameState.currentRound,
+        categories: gameState.categories
+      });
+      
+      gameState.roundPhase = 'writing';
+      setTimeout(() => startTimer(roomId), 500);
+    }, 3000);
+    
+    logEvent({ event: 'autoNextRound', roomId, message: `Auto-iniciando ronda ${gameState.currentRound} con letra ${gameState.currentLetter}` });
+  }
+
+  delete gameState.reviewData;
+  logEvent({ event: 'autoFinishReview', roomId, message: 'Revisión finalizada automáticamente' });
+}
+
+/**
+ * Procesa los resultados finales de la revisión
+ */
+function processFinalReviewResults(gameState) {
+  const results = {};
+  
+  if (!gameState.reviewData || !gameState.words) return results;
+
+  Object.keys(gameState.words).forEach(playerId => {
+    const playerWords = gameState.words[playerId] || {};
+    results[playerId] = {};
+    
+    Object.keys(playerWords).forEach(category => {
+      const wordId = `${playerId}-${category}`;
+      const word = playerWords[category];
+      const wordVotes = gameState.reviewData.votes[wordId] || {};
+      const consensus = gameState.reviewData.consensusReached[wordId];
+      const stats = calculateWordVoteStats(wordVotes);
+      
+      // Determinar validez final
+      let isValid = false;
+      if (consensus) {
+        isValid = consensus === 'approve';
+      } else if (stats.totalVotes > 0) {
+        // Sin consenso: decidir por mayoría simple
+        isValid = stats.approvals >= stats.rejections;
+      } else {
+        // Sin votos: considerar válida si empieza con la letra correcta
+        isValid = word && word.charAt(0).toUpperCase() === gameState.currentLetter;
+      }
+      
+      results[playerId][category] = {
+        word,
+        isValid,
+        votes: stats,
+        consensus,
+        points: calculateWordPoints(word, isValid, stats, gameState)
+      };
+    });
+  });
+  
+  return results;
+}
+
+/**
+ * Calcula puntos para una palabra basado en validación social
+ */
+function calculateWordPoints(word, isValid, voteStats, gameState) {
+  if (!isValid || !word) return 0;
+  
+  let points = 0;
+  
+  // Puntos base por palabra válida
+  points += 5;
+  
+  // Bonus por consenso fuerte
+  if (voteStats.approvalRate >= 0.8) {
+    points += 3; // Bonus por consenso muy fuerte
+  } else if (voteStats.approvalRate >= 0.6) {
+    points += 1; // Bonus por consenso moderado
+  }
+  
+  // Bonus por originalidad (si es única en esa categoría)
+  // TODO: Implementar verificación de unicidad
+  
+  // Bonus por sílabas (opcional)
+  const syllables = countSyllables(word);
+  if (syllables >= 4) {
+    points += 2; // Bonus por palabra larga
+  }
+  
+  return points;
+}
+
+/**
+ * Actualiza las puntuaciones de los jugadores basado en los resultados de revisión
+ */
+function updatePlayerScoresFromReview(gameState, finalResults) {
+  Object.keys(finalResults).forEach(playerId => {
+    const player = gameState.players.find(p => p.id === playerId);
+    if (!player) return;
+    
+    const playerResults = finalResults[playerId];
+    let totalPoints = 0;
+    
+    Object.values(playerResults).forEach(result => {
+      totalPoints += result.points || 0;
+    });
+    
+    player.score += totalPoints;
+  });
 }
 
 // Función para calcular puntuaciones con el sistema clásico

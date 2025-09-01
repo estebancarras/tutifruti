@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados - Tutifrutti</title>
+    <link rel="stylesheet" href="/public/css/base.css">
+    <link rel="stylesheet" href="/public/css/components.css">
+    <link rel="stylesheet" href="/public/css/results.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="results-header">
+            <div class="round-info">
+                <span class="round-number">Ronda <span id="currentRound">1</span></span>
+                <span class="letter-used">Letra: <span id="resultLetter">A</span></span>
+            </div>
+            <div class="game-info">
+                <h1 class="game-title">¡Resultados de la Revisión!</h1>
+                <p class="subtitle">Puntuaciones actualizadas con validación social</p>
+            </div>
+        </header>
+
+        <!-- Contenido principal -->
+        <main class="results-main" role="main">
+            <!-- Tabla de puntuaciones -->
+            <section class="leaderboard">
+                <h2>Tabla de Posiciones</h2>
+                <div class="leaderboard-table" id="leaderboardTable">
+                    <!-- Se carga dinámicamente -->
+                </div>
+            </section>
+
+            <!-- Detalles de palabras -->
+            <section class="words-details">
+                <h2>Detalles de la Ronda</h2>
+                <div class="players-grid" id="playersGrid">
+                    <!-- Se carga dinámicamente -->
+                </div>
+            </section>
+
+            <!-- Acciones -->
+            <section class="actions">
+                <div class="action-buttons">
+                    <button id="continueBtn" class="btn btn-primary">
+                        <span class="btn-icon">▶️</span>
+                        Continuar Juego
+                    </button>
+                    <button id="newGameBtn" class="btn btn-secondary">
+                        <span class="btn-icon">🔄</span>
+                        Nueva Partida
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modales -->
+    <div id="gameEndedModal" class="modal" role="dialog" aria-labelledby="gameEndedTitle" aria-hidden="true">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="gameEndedTitle">¡Juego Terminado!</h3>
+            </div>
+            <div class="modal-body">
+                <div class="winner-section" id="winnerSection">
+                    <!-- Ganador se carga dinámicamente -->
+                </div>
+                <div class="final-scores" id="finalScores">
+                    <!-- Puntuaciones finales se cargan dinámicamente -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="playAgainBtn" class="btn btn-primary">
+                    <span class="btn-icon">🔄</span>
+                    Jugar de Nuevo
+                </button>
+                <button id="exitBtn" class="btn btn-secondary">
+                    <span class="btn-icon">🏠</span>
+                    Salir
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div id="toastContainer" class="toast-container" role="status" aria-live="polite"></div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="module">
+        import { socketManager } from '/public/js/socket-manager.js';
+        import { storage, showNotification } from '/utils/helpers.js';
+        import { SOCKET_EVENTS, ROUTES } from '/utils/constants.js';
+
+        // Estado global de resultados
+        let resultsData = {
+            roomId: null,
+            round: 1,
+            letter: 'A',
+            finalResults: {},
+            playerScores: [],
+            isGameEnded: false
+        };
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', init);
+
+        async function init() {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const roomId = urlParams.get('roomId');
+                
+                if (!roomId) {
+                    showNotification('ID de sala no encontrado', 'error');
+                    setTimeout(() => window.location.href = ROUTES.HOME, 2000);
+                    return;
+                }
+
+                resultsData.roomId = roomId;
+                
+                // Configurar event listeners
+                setupEventListeners();
+                setupSocketListeners();
+                
+                // Conectar al servidor
+                await socketManager.connect();
+                
+                showNotification('Cargando resultados...', 'info');
+                
+            } catch (error) {
+                console.error('Error inicializando resultados:', error);
+                showNotification('Error al cargar los resultados', 'error');
+            }
+        }
+
+        function setupEventListeners() {
+            // Botón continuar
+            document.getElementById('continueBtn')?.addEventListener('click', () => {
+                if (resultsData.isGameEnded) {
+                    showNotification('El juego ha terminado', 'info');
+                } else {
+                    showNotification('Esperando próxima ronda...', 'info');
+                }
+            });
+
+            // Botón nueva partida
+            document.getElementById('newGameBtn')?.addEventListener('click', () => {
+                if (confirm('¿Estás seguro de que quieres iniciar una nueva partida?')) {
+                    window.location.href = ROUTES.CREATE_ROOM;
+                }
+            });
+
+            // Botón jugar de nuevo
+            document.getElementById('playAgainBtn')?.addEventListener('click', () => {
+                window.location.href = ROUTES.CREATE_ROOM;
+            });
+
+            // Botón salir
+            document.getElementById('exitBtn')?.addEventListener('click', () => {
+                window.location.href = ROUTES.HOME;
+            });
+        }
+
+        function setupSocketListeners() {
+            // Resultados de revisión
+            socketManager.on(SOCKET_EVENTS.REVIEW_ENDED, (data) => {
+                console.log('Resultados de revisión recibidos:', data);
+                displayResults(data);
+            });
+
+            // Fin de juego
+            socketManager.on(SOCKET_EVENTS.GAME_ENDED, (data) => {
+                console.log('Juego terminado:', data);
+                resultsData.isGameEnded = true;
+                showGameEndedModal(data);
+            });
+
+            // Próxima ronda
+            socketManager.on(SOCKET_EVENTS.ROUND_START, (data) => {
+                console.log('Nueva ronda iniciada:', data);
+                showNotification('¡Nueva ronda iniciada! Redirigiéndote...', 'success');
+                setTimeout(() => {
+                    window.location.href = `${ROUTES.GAME}?roomId=${resultsData.roomId}`;
+                }, 2000);
+            });
+
+            // Errores
+            socketManager.on(SOCKET_EVENTS.ERROR, (data) => {
+                console.error('Error recibido:', data);
+                showNotification(data.message || 'Error en el servidor', 'error');
+            });
+        }
+
+        function displayResults(data) {
+            try {
+                resultsData = { ...resultsData, ...data };
+                
+                // Actualizar header
+                updateHeader(data);
+                
+                // Mostrar tabla de posiciones
+                renderLeaderboard(data.playerScores || []);
+                
+                // Mostrar detalles de palabras
+                renderWordsDetails(data.finalResults || {});
+                
+                // Mostrar notificación de éxito
+                showNotification('¡Resultados cargados!', 'success');
+                
+            } catch (error) {
+                console.error('Error mostrando resultados:', error);
+                showNotification('Error al mostrar los resultados', 'error');
+            }
+        }
+
+        function updateHeader(data) {
+            const currentRound = document.getElementById('currentRound');
+            const resultLetter = document.getElementById('resultLetter');
+            
+            if (currentRound) currentRound.textContent = data.round || 1;
+            if (resultLetter) resultLetter.textContent = data.letter || 'A';
+        }
+
+        function renderLeaderboard(playerScores) {
+            const container = document.getElementById('leaderboardTable');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            playerScores.sort((a, b) => b.score - a.score).forEach((player, index) => {
+                const position = index + 1;
+                const positionEmoji = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : '📍';
+                
+                const playerRow = document.createElement('div');
+                playerRow.className = `leaderboard-row position-${position}`;
+                
+                playerRow.innerHTML = `
+                    <div class="position">
+                        <span class="position-emoji">${positionEmoji}</span>
+                        <span class="position-number">${position}</span>
+                    </div>
+                    <div class="player-info">
+                        <h3 class="player-name">${player.name}</h3>
+                    </div>
+                    <div class="score">
+                        <span class="score-value">${player.score}</span>
+                        <span class="score-label">puntos</span>
+                    </div>
+                `;
+                
+                container.appendChild(playerRow);
+            });
+        }
+
+        function renderWordsDetails(finalResults) {
+            const container = document.getElementById('playersGrid');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            
+            Object.entries(finalResults).forEach(([playerId, playerResults]) => {
+                const playerCard = document.createElement('div');
+                playerCard.className = 'player-card';
+                
+                const playerName = resultsData.playerScores.find(p => p.id === playerId)?.name || 'Jugador';
+                
+                let wordsHtml = '';
+                Object.entries(playerResults).forEach(([category, result]) => {
+                    const statusClass = result.isValid ? 'valid' : 'invalid';
+                    const statusIcon = result.isValid ? '✅' : '❌';
+                    const consensusText = result.consensus ? ` (${result.consensus === 'approve' ? 'Aprobada' : 'Rechazada'})` : '';
+                    
+                    wordsHtml += `
+                        <div class="word-row ${statusClass}">
+                            <span class="category">${category}</span>
+                            <span class="word">${result.word || '-'}</span>
+                            <span class="status">${statusIcon}</span>
+                            <span class="points">+${result.points || 0}</span>
+                        </div>
+                    `;
+                });
+                
+                playerCard.innerHTML = `
+                    <div class="player-card-header">
+                        <h3 class="player-name">${playerName}</h3>
+                    </div>
+                    <div class="words-list">
+                        ${wordsHtml}
+                    </div>
+                `;
+                
+                container.appendChild(playerCard);
+            });
+        }
+
+        function showGameEndedModal(data) {
+            const modal = document.getElementById('gameEndedModal');
+            const winnerSection = document.getElementById('winnerSection');
+            const finalScores = document.getElementById('finalScores');
+            
+            if (!modal || !winnerSection || !finalScores) return;
+            
+            // Mostrar ganador
+            const winner = data.playerScores[0];
+            winnerSection.innerHTML = `
+                <div class="winner-card">
+                    <div class="winner-emoji">🎉</div>
+                    <h2 class="winner-name">¡${winner.name} ha ganado!</h2>
+                    <p class="winner-score">${winner.score} puntos</p>
+                </div>
+            `;
+            
+            // Mostrar puntuaciones finales
+            let scoresHtml = '';
+            data.playerScores.forEach((player, index) => {
+                scoresHtml += `
+                    <div class="final-score-row">
+                        <span class="position">${index + 1}°</span>
+                        <span class="name">${player.name}</span>
+                        <span class="score">${player.score}</span>
+                    </div>
+                `;
+            });
+            
+            finalScores.innerHTML = `<div class="final-scores-list">${scoresHtml}</div>`;
+            
+            // Mostrar modal
+            modal.classList.add('show');
+            modal.setAttribute('aria-hidden', 'false');
+        }
+
+        // Prevenir navegación accidental
+        window.addEventListener('beforeunload', (e) => {
+            if (!resultsData.isGameEnded) {
+                e.preventDefault();
+                e.returnValue = '¿Estás seguro de que quieres salir durante la partida?';
+            }
+        });
+
+        // Exportar para debugging
+        window.resultsDebug = {
+            resultsData,
+            socketManager
+        };
+    </script>
+</body>
+</html>
+
+

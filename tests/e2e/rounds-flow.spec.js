@@ -1,88 +1,98 @@
 // @ts-check
-import { test, expect } from '@playwright/test';
-
-const BASE = 'http://localhost:3000';
+const { test, expect } = require('@playwright/test');
 
 test.describe('E2E: flujo de rondas (maxRounds=1) y equidad de inputs', () => {
-  test('host crea con 1 ronda, invitado se une, todos escriben tras ruleta y finaliza en Resultados Finales', async ({ browser }) => {
-    // Contexto HOST
-    const contextHost = await browser.newContext();
-    const host = await contextHost.newPage();
+  test('host crea con 1 ronda, invitado se une, todos escriben tras roundStart y finaliza en Resultados Finales', async ({ browser }) => {
+    // Crear dos contextos para simular dos jugadores
+    const context1 = await browser.newContext();
+    const context2 = await browser.newContext();
+    
+    const host = await context1.newPage();
+    const guest = await context2.newPage();
 
-    // HOST: index -> create-room
-    await host.goto(`${BASE}/index.html`);
-    await host.fill('#username', 'host-rounds');
-    await host.click('#createRoomButton');
-    await expect(host).toHaveURL(/\/views\/create-room\.html/);
-
-    // Establecer 1 ronda y crear sala
-    await host.fill('#rounds', '1');
-    await host.click('#createRoomButton');
-    await expect(host.locator('#roomCodeValue')).toHaveText(/[a-z0-9]{5,}/i, { timeout: 10000 });
-    const roomCode = await host.locator('#roomCodeValue').innerText();
-
-    // Contexto INVITADO
-    const contextGuest = await browser.newContext();
-    const guest = await contextGuest.newPage();
-
-    // INVITADO: index -> join-room
-    await guest.goto(`${BASE}/index.html`);
-    await guest.fill('#username', 'guest-rounds');
-    await guest.click('#joinRoomButton');
-    await expect(guest).toHaveURL(/\/views\/join-room\.html/);
-
-    await guest.fill('#roomCodeInput', roomCode);
-    await guest.click('#joinRoomButton');
-
-    // Sala de espera
-    await guest.waitForSelector('.waiting-room-container', { timeout: 15000 });
-    await expect(guest.locator('#waiting-players-count')).toHaveText('2', { timeout: 15000 });
-
-    // HOST ve 2 jugadores y botón habilitado
-    await expect(host.locator('#playersCountDisplay')).toHaveText(/2\/\d+/, { timeout: 15000 });
-    await expect(host.locator('#goToGameButton')).toBeEnabled({ timeout: 15000 });
-
-    // HOST: iniciar juego
-    await host.click('#goToGameButton');
-
-    // Ambos llegan a game.html
-    await expect(host).toHaveURL(/\/views\/game\.html\?roomId=/, { timeout: 15000 });
-    await expect(guest).toHaveURL(/\/views\/game\.html\?roomId=/, { timeout: 15000 });
-
-    // Esperar SHOW_ROULETTE y que host tenga botón "Girar Ruleta"
-    const hostSpinBtn = host.locator('#spinWheelButton');
-    await expect(hostSpinBtn).toBeVisible({ timeout: 15000 });
-
-    // HOST: girar ruleta
-    await hostSpinBtn.click();
-
-    // Esperar que aparezca una letra seleccionada distinta de "?"
-    const letterLocatorHost = host.locator('#currentLetterDisplay');
-    await expect(letterLocatorHost).toHaveText(/[A-ZÑÁÉÍÓÚÜ]/i, { timeout: 15000 });
-    const letter = (await letterLocatorHost.innerText()).trim().charAt(0).toUpperCase();
-
-    // Ambos deberían poder escribir tras la ruleta (inputs habilitados)
-    const hostNameInput = host.locator('#input-NOMBRE');
-    const guestNameInput = guest.locator('#input-NOMBRE');
-
-    await expect(hostNameInput).toBeEnabled({ timeout: 15000 });
-    await expect(guestNameInput).toBeEnabled({ timeout: 15000 });
-
-    // Completar palabras válidas y enviar en ambos
-    const validWord = `${letter}a`;
-    await hostNameInput.fill(validWord);
-    await host.click('#submitWordButton');
-
-    await guestNameInput.fill(validWord);
-    await guest.click('#submitWordButton');
-
-    // Debe aparecer modal de resultados de la ronda
-    await expect(host.getByText('Resultados de la Ronda')).toBeVisible({ timeout: 20000 });
-
-    // Como maxRounds=1, el juego debe terminar con "Resultados Finales"
-    await expect(host.getByRole('heading', { name: 'Resultados Finales' })).toBeVisible({ timeout: 30000 });
-
-    await contextGuest.close();
-    await contextHost.close();
+    try {
+      // HOST: ir a index y crear sala
+      await host.goto('http://localhost:3000');
+      await host.fill('#username', 'host-e2e');
+      await host.click('.btn-primary');
+      
+      await host.waitForURL('**/create-room.html');
+      await host.fill('#roomName', 'Sala 1 Ronda');
+      await host.fill('#rounds', '1');
+      await host.click('#createRoomBtn');
+      
+      // Obtener código de sala
+      await host.waitForSelector('#roomCode', { state: 'visible' });
+      const roomCode = await host.textContent('#roomCode');
+      
+      // GUEST: ir a index y unirse
+      await guest.goto('http://localhost:3000');
+      await guest.fill('#username', 'guest-e2e');
+      await guest.click('.btn-primary');
+      
+      await guest.waitForURL('**/join-room.html');
+      await guest.fill('#joinRoomId', roomCode.trim());
+      await guest.click('#joinRoomBtn');
+      
+      // Esperar que ambos estén en la sala
+      await host.waitForSelector('.player-item', { state: 'visible' });
+      await guest.waitForSelector('.waiting-room', { state: 'visible' });
+      
+      // HOST: iniciar juego (ahora genera letra automáticamente)
+      await host.click('#goToGameButton');
+      
+      // Ambos deberían ir al juego
+      await host.waitForURL('**/game.html*');
+      await guest.waitForURL('**/game.html*');
+      
+      // Esperar que se cargue la interfaz del juego
+      await host.waitForSelector('#categoriesGrid .category-card');
+      await guest.waitForSelector('#categoriesGrid .category-card');
+      
+      // HOST: llenar palabras
+      await host.fill('#input-NOMBRE', 'Ana');
+      await host.fill('#input-ANIMAL', 'Avestruz');
+      await host.fill('#input-COSA', 'Auto');
+      await host.fill('#input-FRUTA', 'Arandano');
+      
+      // GUEST: llenar palabras
+      await guest.fill('#input-NOMBRE', 'Bruno');
+      await guest.fill('#input-ANIMAL', 'Ballena');
+      await guest.fill('#input-COSA', 'Barco');
+      await guest.fill('#input-FRUTA', 'Banana');
+      
+      // Ambos envían palabras
+      await host.click('#submitWordButton');
+      await guest.click('#submitWordButton');
+      
+      // Deberían ser redirigidos a revisión
+      await host.waitForURL('**/review.html*', { timeout: 10000 });
+      await guest.waitForURL('**/review.html*', { timeout: 10000 });
+      
+      // Verificar que la interfaz de revisión se carga
+      await host.waitForSelector('.words-grid .word-card');
+      await guest.waitForSelector('.words-grid .word-card');
+      
+      // HOST: finalizar revisión (como creador)
+      await host.click('#finishReviewBtn');
+      
+      // Ambos deberían ir a resultados
+      await host.waitForURL('**/results.html*', { timeout: 10000 });
+      await guest.waitForURL('**/results.html*', { timeout: 10000 });
+      
+      // Verificar que se muestran los resultados
+      await host.waitForSelector('.leaderboard-table .leaderboard-row');
+      await guest.waitForSelector('.leaderboard-table .leaderboard-row');
+      
+      // Verificar que hay al menos un jugador en la tabla
+      const hostLeaderboardRows = await host.locator('.leaderboard-row').count();
+      const guestLeaderboardRows = await guest.locator('.leaderboard-row').count();
+      expect(hostLeaderboardRows).toBeGreaterThanOrEqual(2);
+      expect(guestLeaderboardRows).toBeGreaterThanOrEqual(2);
+      
+    } finally {
+      await context1.close();
+      await context2.close();
+    }
   });
 });

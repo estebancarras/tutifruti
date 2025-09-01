@@ -436,6 +436,23 @@
   border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
+/* Botón ¡BASTA! con efecto especial */
+#bastaButton.btn--pulse {
+  animation: bastaPulse 1.5s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+}
+
+@keyframes bastaPulse {
+  0%, 100% { 
+    transform: scale(1); 
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4);
+  }
+  50% { 
+    transform: scale(1.05); 
+    box-shadow: 0 0 30px rgba(245, 158, 11, 0.6);
+  }
+}
+
 /* Ruleta */
 .roulette-container {
   position: relative;

@@ -442,6 +442,10 @@
       // Crear sala
       createRoomForm.addEventListener('submit', handleCreateRoom);
 
+      // Validación en tiempo real del formulario
+      roomNameInput.addEventListener('input', validateForm);
+      roundsInput.addEventListener('input', validateForm);
+
       // Copiar código
       copyCodeButton.addEventListener('click', copyRoomCode);
       roomCodeValue.addEventListener('click', copyRoomCode);
@@ -452,7 +456,7 @@
         }
       });
 
-      // Iniciar juego: emitir y esperar evento SHOW_ROULETTE para redirigir
+      // Iniciar juego: emitir y esperar evento ROUND_START para redirigir
       goToGameButton.addEventListener('click', () => {
         if (roomData.roomId && roomData.players.length >= 2) {
           socketManager.startGame(roomData.roomId);
@@ -471,6 +475,24 @@
 
       // Auto-focus en el nombre de la sala
       roomNameInput.focus();
+      
+      // Validar formulario inicial
+      validateForm();
+    }
+
+    function validateForm() {
+      const roomName = roomNameInput.value.trim();
+      const rounds = parseInt(roundsInput?.value, 10) || 5;
+      
+      const isValid = roomName.length > 0 && rounds >= 1 && rounds <= 20;
+      
+      createRoomButton.disabled = !isValid;
+      
+      if (isValid) {
+        createRoomButton.classList.remove('btn--disabled');
+      } else {
+        createRoomButton.classList.add('btn--disabled');
+      }
     }
 
     function setupSocketListeners() {
@@ -478,13 +500,7 @@
       socketManager.on(SOCKET_EVENTS.JOINED_ROOM, handleJoinedRoom);
       socketManager.on(SOCKET_EVENTS.PLAYER_JOINED, handlePlayerJoined);
       socketManager.on(SOCKET_EVENTS.PLAYER_LEFT, handlePlayerLeft);
-      // Escuchar tanto el evento legacy como el nuevo para compatibilidad
-      socketManager.on(SOCKET_EVENTS.SHOW_ROULETTE, () => {
-        if (roomData.roomId) {
-          window.location.href = `${ROUTES.GAME}?roomId=${roomData.roomId}`;
-        }
-      });
-      
+      // Escuchar inicio de ronda para redirección automática
       socketManager.on(SOCKET_EVENTS.ROUND_START, () => {
         if (roomData.roomId) {
           window.location.href = `${ROUTES.GAME}?roomId=${roomData.roomId}`;

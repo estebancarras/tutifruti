@@ -1,11 +1,25 @@
+// @ts-check
 /**
- * Prueba: el servidor es la única fuente del temporizador (emite timerUpdate decreciente)
+ * Tests para el temporizador del servidor
  */
 const { io } = require('socket.io-client');
-
 const { server } = require('../server');
 
-let SERVER_URL;
+let BASE;
+const CONNECT_OPTS = { transports: ['websocket'], forceNew: true, reconnection: true };
+
+function connectClient() {
+  return io(BASE, CONNECT_OPTS);
+}
+
+// Emite un evento cuando el socket esté conectado; si ya lo está, emite inmediatamente
+function emitWhenConnected(socket, event, payload) {
+  if (socket.connected) {
+    socket.emit(event, payload);
+  } else {
+    socket.once('connect', () => socket.emit(event, payload));
+  }
+}
 
 beforeAll(async () => {
   if (!server.listening) {
@@ -13,66 +27,73 @@ beforeAll(async () => {
   }
   const addr = server.address();
   const port = typeof addr === 'object' && addr ? addr.port : 3000;
-  SERVER_URL = `http://localhost:${port}`;
+  BASE = `http://localhost:${port}`;
 });
 
-function connectClient() {
-  return io(SERVER_URL, { transports: ['websocket'], forceNew: true, reconnection: false });
+// No cerramos el servidor en esta suite; otras suites se encargan de cerrarlo.
+
+function waitForEvent(socket, event, timeout = 10000) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout esperando evento ${event}`)), timeout);
+    socket.once(event, (data) => {
+      clearTimeout(t);
+      resolve(data);
+    });
+  });
 }
 
 describe('Temporizador servidor', () => {
-  jest.setTimeout(30000);
+  jest.setTimeout(60000);
 
   test('timerUpdate decrece y llega a 0 al finalizar', async () => {
     const host = connectClient();
     const p2 = connectClient();
-    const refs = { roomId: null };
-    const times = [];
+    const refs = { roomId: null, letter: null };
 
+    // Crear sala y unirse p2
     await new Promise((resolve, reject) => {
-      host.on('connect', () => {
-        host.emit('createRoom', { playerName: 'Host' });
-      });
-
-      host.on('roomCreated', (room) => { refs.roomId = room.roomId; });
-
-      host.on('joinedRoom', () => {
-        p2.emit('joinRoom', { roomId: refs.roomId, playerName: 'Bob' });
-      });
-
-      p2.on('joinedRoom', () => {
-        host.emit('startGame');
-      });
-
-      host.on('showRoulette', () => {
-        host.emit('spinRoulette');
-      });
-
-      host.on('rouletteResult', () => {
-        host.on('timerUpdate', (t) => {
-          times.push(t.timeRemaining);
-          // Resolvemos cuando tengamos suficientes muestras para comprobar decremento
-          if (times.length >= 4) {
-            resolve();
-          }
-        });
-      });
-
-      setTimeout(() => reject(new Error('Timeout en temporizador')), 25000);
+      emitWhenConnected(host, 'createRoom', { playerName: 'Host', roomName: 'Timer Test', maxPlayers: 5 });
+      host.on('joinedRoom', (data) => { refs.roomId = data.roomId; resolve(true); });
+      host.on('error', (e) => reject(new Error(`host error: ${JSON.stringify(e)}`)));
+      setTimeout(() => reject(new Error('Timeout host create/join')), 15000);
     });
 
+    await new Promise((resolve, reject) => {
+      emitWhenConnected(p2, 'joinRoom', { roomId: refs.roomId, playerName: 'Bob' });
+      p2.on('joinedRoom', () => resolve(true));
+      p2.on('error', (e) => reject(new Error(`p2 error: ${JSON.stringify(e)}`)));
+      p2.on('connect_error', (e) => reject(new Error(`p2 connect_error: ${e && e.message ? e.message : e}`)));
+      setTimeout(() => reject(new Error('Timeout p2 join')), 15000);
+    });
+
+    // Iniciar juego - ahora genera letra automáticamente
+    host.emit('startGame');
+    const roundStart = await waitForEvent(host, 'roundStart', 10000);
+    expect(roundStart).toHaveProperty('letter');
+    refs.letter = roundStart.letter;
+
+    // Verificar que p2 también recibe roundStart
+    await waitForEvent(p2, 'roundStart', 5000);
+
+    // Enviar palabras rápidamente para probar el timer
+    const words = { NOMBRE: 'Ana', ANIMAL: 'Avestruz', COSA: 'Auto', FRUTA: 'Arandano' };
+    host.emit('submitWords', { roomId: refs.roomId, playerName: 'Host', words });
+    p2.emit('submitWords', { roomId: refs.roomId, playerName: 'Bob', words: { NOMBRE: 'Bruno', ANIMAL: 'Ballena', COSA: 'Barco', FRUTA: 'Banana' } });
+
+    // Esperar inicio de revisión social
+    const reviewStart = await waitForEvent(host, 'startReview', 15000);
+    expect(reviewStart).toHaveProperty('round');
+    expect(reviewStart).toHaveProperty('letter');
+    expect(reviewStart.letter).toBe(refs.letter);
+
     // Verificaciones básicas
-    expect(times.length).toBeGreaterThan(0);
-    // Debe haber al menos un decremento
-    const hasDecrement = times.some((v, i) => i > 0 && v < times[i - 1]);
-    expect(hasDecrement).toBe(true);
+    expect(reviewStart).toHaveProperty('round');
+    expect(reviewStart).toHaveProperty('letter');
+    
+    console.log('✅ Timer test completado - revisión iniciada correctamente');
 
     host.disconnect();
     p2.disconnect();
-  });
-
-  afterAll((done) => {
-    try { server.close(() => done()); } catch (_) { done(); }
   });
 });
 

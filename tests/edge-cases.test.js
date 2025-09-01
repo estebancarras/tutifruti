@@ -119,7 +119,7 @@ describe('Socket.IO edge cases', () => {
 
     // Iniciar juego
     host.emit('startGame');
-    await waitForEvent(host, 'showRoulette', 10000);
+    await waitForEvent(host, 'roundStart', 10000);
 
     // Tercer jugador intenta unirse: debe fallar "El juego ya ha comenzado"
     const err = await new Promise((resolve) => {
@@ -136,7 +136,7 @@ describe('Socket.IO edge cases', () => {
     p3.disconnect();
   });
 
-  test('No-creador no puede startGame ni spinRoulette', async () => {
+  test('No-creador no puede startGame', async () => {
     const host = connectClient();
     const p2 = connectClient();
     const refs = { roomId: null };
@@ -167,15 +167,10 @@ describe('Socket.IO edge cases', () => {
 
     // Host inicia correctamente
     host.emit('startGame');
-    await waitForEvent(host, 'showRoulette', 10000);
+    await waitForEvent(host, 'roundStart', 10000);
 
-    // p2 intenta girar: debe error
-    const errSpin = await new Promise((resolve) => {
-      p2.emit('spinRoulette');
-      p2.once('error', (e) => resolve(e));
-      setTimeout(() => resolve({ message: 'NO_ERROR' }), 2000);
-    });
-    expect(errSpin && errSpin.message).toMatch(/solo el creador/i);
+    // Verificar que p2 también recibe roundStart pero no puede controlar el juego
+    await waitForEvent(p2, 'roundStart', 5000);
 
     host.disconnect();
     p2.disconnect();
@@ -223,11 +218,9 @@ describe('Socket.IO edge cases', () => {
       setTimeout(() => reject(new Error('Timeout p2 joinedRoom')), 15000);
     });
 
-    // start and spin to get letter
+    // start game with new flow
     host.emit('startGame');
-    await waitForEvent(host, 'showRoulette', 10000);
-    host.emit('spinRoulette');
-    const rr = await waitForEvent(host, 'rouletteResult', 15000);
+    const rr = await waitForEvent(host, 'roundStart', 10000);
     expect(rr).toHaveProperty('letter');
     refs.letter = rr.letter;
 
@@ -244,25 +237,13 @@ describe('Socket.IO edge cases', () => {
     host.emit('submitWords', { roomId: refs.roomId, playerName: 'Host', words: badWords(badPrefix) });
     p2.emit('submitWords', { roomId: refs.roomId, playerName: 'Bob', words: badWords(badPrefix) });
 
-    const ended = await waitForEvent(host, 'roundEnded', 15000);
-    expect(ended).toHaveProperty('scores');
-    expect(ended).toHaveProperty('validWords');
-    expect(ended).toHaveProperty('playerScores');
+    const reviewStart = await waitForEvent(host, 'startReview', 15000);
+    expect(reviewStart).toHaveProperty('round');
+    expect(reviewStart).toHaveProperty('letter');
+    expect(reviewStart.letter).toBe(refs.letter);
 
-    // Ambos con total 0 (todas inválidas)
-    const scoreHost = ended.scores['Host'];
-    const scoreBob = ended.scores['Bob'];
-    expect(scoreHost && scoreHost.total).toBe(0);
-    expect(scoreBob && scoreBob.total).toBe(0);
-
-    // validWords false para ambas personas y todas categorías
-    const vHost = ended.validWords['Host'];
-    const vBob = ended.validWords['Bob'];
-    expect(vHost && vBob).toBeTruthy();
-    ['NOMBRE','ANIMAL','COSA','FRUTA'].forEach((cat) => {
-      expect(vHost[cat]).toBe(false);
-      expect(vBob[cat]).toBe(false);
-    });
+    // Con el nuevo flujo, las palabras con letra incorrecta pasan a revisión
+    // donde serán rechazadas por los jugadores
 
     host.disconnect();
     p2.disconnect();

@@ -178,11 +178,35 @@ class SocketManager {
   }
 
   /**
+   * Se une a una sala de revisión social
+   * @param {{roomId: string}} data
+   */
+  joinReviewRoom(data) {
+    this.emit(SOCKET_EVENTS.JOIN_REVIEW_ROOM, data);
+  }
+
+  /**
    * Emite un voto de validación durante la fase de revisión
-   * @param {{roomId: string, voterName: string, targetPlayer: string, category: string, decision: 'valid'|'invalid'}} data
+   * @param {{roomId: string, wordId: string, vote: 'approve'|'reject'}} data
    */
   castVote(data) {
     this.emit(SOCKET_EVENTS.CAST_VOTE, data);
+  }
+
+  /**
+   * Termina la fase de revisión (solo host)
+   * @param {{roomId: string}} data
+   */
+  finishReview(data) {
+    this.emit(SOCKET_EVENTS.FINISH_REVIEW, data);
+  }
+
+  /**
+   * Salta al siguiente jugador en revisión (solo host)
+   * @param {{roomId: string}} data
+   */
+  skipCurrentPlayer(data) {
+    this.emit(SOCKET_EVENTS.SKIP_CURRENT_PLAYER, data);
   }
 
   /**
@@ -191,6 +215,40 @@ class SocketManager {
    */
   nextRound(roomId) {
     this.emit(SOCKET_EVENTS.NEXT_ROUND, { roomId });
+  }
+
+  // ===== MÉTODOS DE REVISIÓN SOCIAL =====
+
+  /**
+   * Unirse a la sala de revisión
+   * @param {string} roomId - ID de la sala
+   */
+  joinReviewRoom(roomId) {
+    this.emit(SOCKET_EVENTS.JOIN_REVIEW_ROOM, { roomId });
+  }
+
+  /**
+   * Emitir un voto durante la revisión
+   * @param {Object} voteData - Datos del voto
+   * @param {string} voteData.wordId - ID de la palabra (formato: playerName-categoryIndex)
+   * @param {string} voteData.vote - 'approve' o 'reject'
+   */
+  castVote(voteData) {
+    this.emit(SOCKET_EVENTS.CAST_VOTE, voteData);
+  }
+
+  /**
+   * Saltar al siguiente jugador (solo host)
+   */
+  skipCurrentPlayer() {
+    this.emit(SOCKET_EVENTS.SKIP_CURRENT_PLAYER);
+  }
+
+  /**
+   * Finalizar revisión y continuar al siguiente paso
+   */
+  finishReview() {
+    this.emit(SOCKET_EVENTS.FINISH_REVIEW);
   }
 }
 

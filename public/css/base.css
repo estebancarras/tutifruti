@@ -7,7 +7,7 @@
 
 /* CSS Custom Properties */
 :root {
-  /* Colors */
+  /* Colors - Modo Claro */
   --color-primary: #667eea;
   --color-primary-dark: #5a67d8;
   --color-primary-light: #a3bffa;
@@ -92,6 +92,17 @@
   /* Layout */
   --container-max-width: 1200px;
   --header-height: 70px;
+  
+  /* Review System Specific Variables */
+  --review-primary: #3b82f6;
+  --review-success: #10b981;
+  --review-danger: #ef4444;
+  --review-warning: #f59e0b;
+  --review-bg: #f8fafc;
+  --review-card: #ffffff;
+  --review-border: #e2e8f0;
+  --review-text: #1e293b;
+  --review-muted: #64748b;
 }
 
 /* CSS Reset */
@@ -266,4 +277,179 @@ legend {
 
 @media (max-width: 1024px) {
   .lg\:hidden { display: none !important; }
+}
+
+/* ===== MODO OSCURO ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Colores ajustados para modo oscuro */
+    --color-background: #0f172a;
+    --color-background-subtle: #1e293b;
+    --color-surface: #334155;
+    --color-surface-elevated: #475569;
+    
+    --color-text-primary: #f1f5f9;
+    --color-text-secondary: #cbd5e1;
+    --color-text-muted: #94a3b8;
+    
+    --color-border: #475569;
+    --color-border-subtle: #334155;
+    
+    /* Colores de estado adaptados */
+    --color-primary: #818cf8;
+    --color-primary-dark: #6366f1;
+    --color-primary-light: #a5b4fc;
+    
+    --color-secondary: #fb7185;
+    --color-secondary-dark: #f43f5e;
+    --color-secondary-light: #fda4af;
+    
+    --color-success: #34d399;
+    --color-success-dark: #10b981;
+    --color-success-light: #6ee7b7;
+    
+    --color-warning: #fbbf24;
+    --color-warning-dark: #f59e0b;
+    --color-warning-light: #fcd34d;
+    
+    --color-error: #f87171;
+    --color-error-dark: #ef4444;
+    --color-error-light: #fca5a5;
+    
+    /* Gradientes ajustados */
+    --gradient-primary: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    --gradient-hero: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+    --gradient-card: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(51, 65, 85, 0.6) 100%);
+    
+    /* Sombras ajustadas */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+    --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.5);
+    --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.4);
+  }
+  
+  /* Fondo del body */
+  body {
+    background: var(--gradient-hero);
+    color: var(--color-text-primary);
+  }
+  
+  /* Ajustes específicos para elementos del juego */
+  .game-container {
+    background: var(--gradient-primary);
+  }
+  
+  .game-header-compact {
+    background: rgba(30, 41, 59, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--color-border-subtle);
+  }
+  
+  .letter-section {
+    background: var(--gradient-card) !important;
+    border: 1px solid var(--color-border);
+  }
+  
+  .categories-grid-new {
+    gap: 1rem;
+  }
+  
+  .category-card {
+    background: rgba(30, 41, 59, 0.9) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--color-border-subtle) !important;
+    box-shadow: var(--shadow-md);
+  }
+  
+  .category-card:hover {
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 8px 25px rgba(129, 140, 248, 0.3);
+  }
+  
+  .word-input {
+    background: rgba(51, 65, 85, 0.8) !important;
+    border-color: var(--color-border) !important;
+    color: var(--color-text-primary) !important;
+  }
+  
+  .word-input:focus {
+    background: rgba(71, 85, 105, 0.9) !important;
+    border-color: var(--color-primary) !important;
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.3) !important;
+  }
+  
+  .word-input.filled {
+    background: rgba(129, 140, 248, 0.1) !important;
+    border-color: var(--color-primary) !important;
+  }
+  
+  /* Botones en modo oscuro */
+  .btn {
+    box-shadow: var(--shadow-md);
+  }
+  
+  .btn--primary {
+    background: var(--color-primary) !important;
+    border-color: var(--color-primary-dark) !important;
+  }
+  
+  .btn--accent {
+    background: var(--color-warning) !important;
+    color: var(--color-text-primary) !important;
+  }
+  
+  .btn--secondary {
+    background: var(--color-surface-elevated) !important;
+    color: var(--color-text-primary) !important;
+    border-color: var(--color-border) !important;
+  }
+  
+  /* Controles del juego */
+  .game-controls {
+    background: rgba(30, 41, 59, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--color-border-subtle);
+  }
+  
+  /* Scorecard */
+  .scorecard {
+    background: var(--gradient-card) !important;
+    border: 1px solid var(--color-border);
+  }
+  
+  /* Notificaciones */
+  .notification {
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .notification.success {
+    background: rgba(52, 211, 153, 0.9) !important;
+    border-color: var(--color-success) !important;
+  }
+  
+  .notification.error {
+    background: rgba(248, 113, 113, 0.9) !important;
+    border-color: var(--color-error) !important;
+  }
+  
+  .notification.warning {
+    background: rgba(251, 191, 36, 0.9) !important;
+    border-color: var(--color-warning) !important;
+  }
+  
+  .notification.info {
+    background: rgba(129, 140, 248, 0.9) !important;
+    border-color: var(--color-primary) !important;
+  }
+  
+  /* Spinner */
+  .spinner-overlay {
+    background: rgba(15, 23, 42, 0.8) !important;
+  }
+  
+  .spinner-content {
+    background: var(--color-surface-elevated) !important;
+    border: 1px solid var(--color-border);
+  }
 }

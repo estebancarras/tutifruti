@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Revisión Social - Tutifruti</title>
+    
+    <!-- Estilos -->
+    <link rel="stylesheet" href="/public/css/base.css">
+    <link rel="stylesheet" href="/public/css/components.css">
+    <link rel="stylesheet" href="/public/css/game.css">
+    <link rel="stylesheet" href="/public/css/review.css">
+    
+    <!-- Fuentes -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+</head>
+<body class="review-body">
+    <div class="review-container">
+        <!-- Header Compacto -->
+        <header class="review-header">
+            <div class="review-header__content">
+                <div class="review-round-info">
+                    <span class="review-round-label">Ronda</span>
+                    <span class="review-round-number" id="currentRound">1</span>
+                </div>
+                <div class="review-letter-display">
+                    <span class="review-letter" id="reviewLetter">A</span>
+                </div>
+                <div class="review-progress-info">
+                    <span class="review-progress-label">Revisando</span>
+                    <span class="review-progress-count" id="reviewProgress">0/0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Panel de Jugador Actual -->
+        <section class="current-player-panel" aria-label="Jugador siendo evaluado">
+            <div class="current-player-header">
+                <div class="current-player-avatar">
+                    <span class="material-symbols-outlined">person</span>
+                </div>
+                <div class="current-player-info">
+                    <h2 class="current-player-name" id="currentPlayerName">Cargando...</h2>
+                    <p class="current-player-subtitle">Sus palabras están siendo evaluadas</p>
+                </div>
+                <div class="current-player-status">
+                    <div class="consensus-indicator" id="consensusIndicator">
+                        <div class="consensus-progress" id="consensusProgress"></div>
+                        <span class="consensus-text" id="consensusText">Evaluando...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Grid de Palabras para Votar -->
+        <main class="words-voting-grid" id="wordsGrid" aria-label="Palabras para evaluar">
+            <!-- Las palabras se generarán dinámicamente -->
+        </main>
+
+        <!-- Panel de Progreso -->
+        <section class="progress-panel">
+            <div class="voting-progress">
+                <h3>Progreso de Votación</h3>
+                <div class="progress-bars" id="progressBars">
+                    <!-- Se generará dinámicamente -->
+                </div>
+            </div>
+            
+            <div class="social-pressure" id="socialPressure">
+                <p class="pressure-text">⏱️ <span id="waitingForText">Esperando votos...</span></p>
+            </div>
+        </section>
+
+        <!-- Sidebar de Jugadores -->
+        <aside class="players-sidebar" id="playersSidebar">
+            <h3 class="sidebar-title">Jugadores</h3>
+            <div class="players-list" id="playersList">
+                <!-- Se generará dinámicamente -->
+            </div>
+        </aside>
+
+        <!-- Controles de Host -->
+        <footer class="review-controls" id="reviewControls">
+            <button class="btn btn--secondary" id="skipPlayerBtn" style="display: none;">
+                <span class="material-symbols-outlined">skip_next</span>
+                Saltar Jugador
+            </button>
+            
+            <button class="btn btn--primary" id="nextRoundBtn" style="display: none;">
+                <span class="material-symbols-outlined">play_arrow</span>
+                Siguiente Ronda
+            </button>
+            
+            <button class="btn btn--accent" id="finishGameBtn" style="display: none;">
+                <span class="material-symbols-outlined">flag</span>
+                Terminar Juego
+            </button>
+        </footer>
+    </div>
+
+    <!-- Modal de Detalles de Palabra -->
+    <div class="modal-overlay" id="wordModalOverlay" style="display: none;">
+        <div class="word-detail-modal" id="wordDetailModal">
+            <header class="modal-header">
+                <h3 id="modalWordTitle">Palabra</h3>
+                <button class="modal-close" id="modalCloseBtn">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </header>
+            
+            <div class="modal-content">
+                <div class="word-info">
+                    <p class="word-category" id="modalWordCategory">Categoría</p>
+                    <p class="word-value" id="modalWordValue">palabra</p>
+                </div>
+                
+                <div class="voting-stats" id="modalVotingStats">
+                    <div class="stat-item">
+                        <span class="stat-icon approve">✓</span>
+                        <span class="stat-count" id="modalApproveCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-icon reject">✗</span>
+                        <span class="stat-count" id="modalRejectCount">0</span>
+                    </div>
+                </div>
+                
+                <div class="modal-actions">
+                    <button class="btn btn--approve" id="modalApproveBtn">
+                        <span class="material-symbols-outlined">check</span>
+                        Aprobar
+                    </button>
+                    <button class="btn btn--reject" id="modalRejectBtn">
+                        <span class="material-symbols-outlined">close</span>
+                        Rechazar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notificaciones Toast -->
+    <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Scripts -->
+    <script type="module" src="/utils/constants.js"></script>
+    <script type="module" src="/public/js/socket-manager.js"></script>
+    <script type="module" src="/public/js/game-state.js"></script>
+    <script type="module" src="/public/js/ui-manager.js"></script>
+    <script type="module" src="/public/js/review-state.js"></script>
+    <script type="module" src="/public/js/review-ui.js"></script>
+
+    <script type="module">
+        import { socketManager } from '/public/js/socket-manager.js';
+        import { gameState } from '/public/js/game-state.js';
+        import { uiManager } from '/public/js/ui-manager.js';
+        import { ReviewState } from '/public/js/review-state.js';
+        import { ReviewUI } from '/public/js/review-ui.js';
+        import { SOCKET_EVENTS } from '/utils/constants.js';
+
+        // Inicializar managers
+        const reviewState = new ReviewState();
+        const reviewUI = new ReviewUI(reviewState);
+        
+        // Configurar eventos Socket.IO
+        function setupSocketListeners() {
+            // Escuchar datos de revisión
+            socketManager.on(SOCKET_EVENTS.REVIEW_DATA, (data) => {
+                console.log('📊 Datos de revisión recibidos:', data);
+                reviewState.initialize(data);
+                reviewUI.renderReviewInterface();
+            });
+
+            // Escuchar actualizaciones de votos
+            socketManager.on(SOCKET_EVENTS.VOTE_UPDATE, (data) => {
+                console.log('🗳️ Actualización de voto:', data);
+                reviewState.updateVotes(data);
+                reviewUI.updateWordCard(data.wordId, data.votes);
+            });
+
+            // Escuchar cambio de jugador
+            socketManager.on(SOCKET_EVENTS.PLAYER_CHANGE, (data) => {
+                console.log('👤 Cambio de jugador:', data);
+                reviewState.changeCurrentPlayer(data.currentPlayer);
+                reviewUI.switchToPlayer(data.currentPlayer);
+            });
+
+            // Escuchar fin de revisión
+            socketManager.on(SOCKET_EVENTS.REVIEW_ENDED, (data) => {
+                console.log('🏁 Revisión terminada:', data);
+                
+                // Mostrar resultados finales
+                uiManager.showNotification(
+                    '¡Revisión completada! Calculando puntuaciones...', 
+                    'success'
+                );
+                
+                // Redirigir según el estado del juego
+                setTimeout(() => {
+                    if (data.gameEnded) {
+                        window.location.href = '/views/results.html';
+                    } else {
+                        window.location.href = '/views/game.html';
+                    }
+                }, 2000);
+            });
+
+            // Escuchar errores de revisión
+            socketManager.on(SOCKET_EVENTS.REVIEW_ERROR, (data) => {
+                console.error('❌ Error de revisión:', data);
+                uiManager.showNotification(data.message, 'error');
+            });
+
+            // Escuchar siguiente ronda
+            socketManager.on(SOCKET_EVENTS.NEXT_ROUND, (data) => {
+                console.log('⏭️ Siguiente ronda:', data);
+                window.location.href = '/views/game.html';
+            });
+        }
+
+        // Configurar eventos de UI
+        function setupUIListeners() {
+            reviewUI.setupEventListeners();
+            
+            // Controles de host
+            document.getElementById('skipPlayerBtn')?.addEventListener('click', () => {
+                socketManager.skipCurrentPlayer();
+            });
+            
+            document.getElementById('nextRoundBtn')?.addEventListener('click', () => {
+                socketManager.nextRound();
+            });
+            
+            document.getElementById('finishGameBtn')?.addEventListener('click', () => {
+                if (confirm('¿Estás seguro de que quieres terminar el juego?')) {
+                    socketManager.finishReview();
+                }
+            });
+        }
+
+        // Inicializar aplicación
+        async function initReviewApp() {
+            try {
+                console.log('🎮 Iniciando aplicación de revisión...');
+                
+                // Verificar si hay datos de sala en localStorage
+                const roomId = localStorage.getItem('roomId');
+                const username = localStorage.getItem('username');
+                
+                if (!roomId || !username) {
+                    console.error('❌ No hay datos de sala. Redirigiendo...');
+                    window.location.href = '/';
+                    return;
+                }
+
+                // Configurar listeners
+                setupSocketListeners();
+                setupUIListeners();
+                
+                // Mostrar spinner inicial
+                uiManager.showSpinner('Cargando revisión...');
+                
+                // Unirse a la sala de revisión
+                console.log(`🔗 Uniéndose a revisión de sala: ${roomId}`);
+                socketManager.joinReviewRoom(roomId);
+                
+            } catch (error) {
+                console.error('❌ Error al inicializar revisión:', error);
+                uiManager.showNotification('Error al cargar la revisión', 'error');
+                
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 3000);
+            }
+        }
+
+        // Inicializar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', initReviewApp);
+    </script>
+</body>
+</html>
