@@ -165,6 +165,15 @@
         
         // Configurar eventos Socket.IO
         function setupSocketListeners() {
+            // Escuchar inicio de revisión (para reconexiones)
+            socketManager.on(SOCKET_EVENTS.START_REVIEW, (data) => {
+                console.log('🔄 Recibido startReview en review.html:', data);
+                // Si ya estamos en review.html, inicializar la interfaz básica
+                if (reviewState.roomId) {
+                    reviewUI.initializeFromStartReview(data);
+                }
+            });
+            
             // Escuchar datos de revisión
             socketManager.on(SOCKET_EVENTS.REVIEW_DATA, (data) => {
                 console.log('📊 Datos de revisión recibidos:', data);
@@ -212,6 +221,16 @@
                 uiManager.showNotification(data.message, 'error');
             });
 
+            // Escuchar estado de sala (para reconexiones)
+            socketManager.on(SOCKET_EVENTS.ROOM_STATE, (data) => {
+                console.log('🏠 Estado de sala recibido en review:', data);
+                // Actualizar el estado con la información de la sala
+                if (data.players && data.players.length > 0) {
+                    reviewState.updatePlayers(data.players);
+                    reviewUI.updatePlayerPanel(data.players);
+                }
+            });
+            
             // Escuchar siguiente ronda
             socketManager.on(SOCKET_EVENTS.NEXT_ROUND, (data) => {
                 console.log('⏭️ Siguiente ronda:', data);
@@ -261,9 +280,14 @@
                 // Mostrar spinner inicial
                 uiManager.showSpinner('Cargando revisión...');
                 
-                // Unirse a la sala de revisión
-                console.log(`🔗 Uniéndose a revisión de sala: ${roomId}`);
-                socketManager.joinReviewRoom(roomId);
+                // Reconectarse a la sala existente
+                console.log(`🔗 Reconectando a sala: ${roomId}`);
+                socketManager.reconnectPlayer({ roomId, playerName: username });
+                
+                // Obtener estado completo de la sala después de reconectar
+                setTimeout(() => {
+                    socketManager.getRoomState({ roomId });
+                }, 500);
                 
             } catch (error) {
                 console.error('❌ Error al inicializar revisión:', error);

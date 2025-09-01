@@ -136,6 +136,31 @@ export class ReviewUI {
     // Ocultar spinner inicial
     uiManager.hideSpinner();
   }
+  
+  /**
+   * Inicializa la interfaz con datos básicos de revisión
+   */
+  initializeFromStartReview(data) {
+    console.log('🔄 Inicializando desde startReview:', data);
+    
+    // Actualizar header básico
+    if (this.elements.currentRound) {
+      this.elements.currentRound.textContent = `Ronda ${data.round}`;
+    }
+    
+    if (this.elements.reviewLetter) {
+      this.elements.reviewLetter.textContent = data.letter;
+    }
+    
+    // Mostrar mensaje de estado
+    if (this.elements.waitingForText) {
+      this.elements.waitingForText.textContent = 'Cargando datos de revisión...';
+      this.elements.waitingForText.style.display = 'block';
+    }
+    
+    // Ocultar spinner inicial
+    uiManager.hideSpinner();
+  }
 
   /**
    * Manejar click de voto
@@ -224,5 +249,29 @@ export class ReviewUI {
 
   setupAccessibilityFeatures() {
     // Implementar accesibilidad básica
+  }
+  
+  /**
+   * Actualiza el panel de jugadores
+   */
+  updatePlayerPanel(players) {
+    console.log('👥 Actualizando panel de jugadores:', players);
+    
+    if (this.elements.playersList) {
+      this.elements.playersList.innerHTML = players.map(player => `
+        <div class="player-item ${player.connected ? 'connected' : 'disconnected'}">
+          <div class="player-avatar">${player.name.charAt(0).toUpperCase()}</div>
+          <div class="player-name">${player.name}</div>
+          ${player.isCreator ? '<div class="player-badge">Anfitrión</div>' : ''}
+          <div class="player-status">${player.connected ? '🟢' : '🔴'}</div>
+        </div>
+      `).join('');
+    }
+    
+    // Actualizar contador de jugadores
+    if (this.elements.reviewProgress) {
+      const connectedCount = players.filter(p => p.connected).length;
+      this.elements.reviewProgress.textContent = `${connectedCount}/${players.length} jugadores`;
+    }
   }
 }

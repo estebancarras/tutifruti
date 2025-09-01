@@ -217,6 +217,14 @@ export class ReviewState {
     const currentPlayer = this.getCurrentPlayer();
     return currentPlayer ? this.data.words[currentPlayer.name] || {} : {};
   }
+  
+  /**
+   * Actualiza la lista de jugadores
+   */
+  updatePlayers(players) {
+    this.data.players = players || [];
+    console.log('👥 Jugadores actualizados en review state:', this.players);
+  }
 
   /**
    * Verificar si una palabra necesita más votos
