@@ -595,22 +595,25 @@
         // Mostrar notificación de transición
         showNotification(data.message || '¡Hora de revisar las palabras!', 'info');
         
-        // SOLUCIÓN ROBUSTA: Redirección con persistencia de estado
-        setTimeout(() => {
-          try {
-            // Guardar estado crítico antes de redirigir
-            localStorage.setItem('reviewTransition', 'true');
-            localStorage.setItem('reviewData', JSON.stringify(data));
-            
-            // Usar replace para mantener la conexión activa
-            const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
-            console.log('🔄 [GAME.HTML] Redirigiendo a revisión:', reviewUrl);
-            window.location.replace(reviewUrl);
-          } catch (redirectError) {
-            console.error('❌ [GAME.HTML] Error en replace, usando href:', redirectError);
-            window.location.href = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
-          }
-        }, 2000);
+        // SOLUCIÓN ROBUSTA: Prevenir desconexión durante transición
+        try {
+          // Guardar estado crítico antes de redirigir
+          localStorage.setItem('reviewTransition', 'true');
+          localStorage.setItem('reviewData', JSON.stringify(data));
+          
+          // Marcar que estamos en transición para evitar desconexión
+          localStorage.setItem('socketTransition', 'true');
+          
+          // Usar replace para mantener la conexión activa
+          const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
+          console.log('🔄 [GAME.HTML] Redirigiendo a revisión INMEDIATAMENTE:', reviewUrl);
+          
+          // Redirección inmediata sin timeout
+          window.location.replace(reviewUrl);
+        } catch (redirectError) {
+          console.error('❌ [GAME.HTML] Error en replace, usando href:', redirectError);
+          window.location.href = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
+        }
         
       } catch (e) {
         console.error('Error en handleStartReview:', e);

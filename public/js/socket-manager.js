@@ -49,15 +49,19 @@ class SocketManager {
       
       // SOLUCIÓN RESILIENTE: Reconexión automática para transiciones críticas
       const isReviewTransition = localStorage.getItem('reviewTransition') === 'true';
+      const isSocketTransition = localStorage.getItem('socketTransition') === 'true';
       const currentPage = window.location.pathname;
       
-      if (isReviewTransition || currentPage.includes('review.html')) {
-        console.log('🔄 [SOCKET] Desconexión durante revisión - reconexión automática en 2s...');
+      if (isReviewTransition || isSocketTransition || currentPage.includes('review.html')) {
+        console.log('🔄 [SOCKET] Desconexión durante transición - reconexión automática en 1s...');
         showNotification('Reconectando automáticamente...', 'warning');
+        
+        // Limpiar flag de transición
+        localStorage.removeItem('socketTransition');
         
         setTimeout(() => {
           this.attemptReconnection();
-        }, 2000);
+        }, 1000);
       } else {
         showNotification('Conexión perdida con el servidor', 'error');
       }
