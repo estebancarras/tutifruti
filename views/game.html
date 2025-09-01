@@ -581,7 +581,12 @@
 
     function handleStartReview(data) {
       try {
-        console.log('[Game] Iniciando revisión social:', data);
+        console.log('🔄 [GAME.HTML] Iniciando revisión social:', data);
+        console.log('🔄 [GAME.HTML] Estado actual del juego:', {
+          roomId: gameState.roomId,
+          isPlaying: gameState.isPlaying,
+          timeRemaining: gameState.timeRemaining
+        });
         
         // Bloquear entradas y botón de enviar
         gameState.disableInputs();
@@ -590,9 +595,21 @@
         // Mostrar notificación de transición
         showNotification(data.message || '¡Hora de revisar las palabras!', 'info');
         
-        // Redireccionar a la página de revisión después de un breve delay
+        // SOLUCIÓN ROBUSTA: Redirección con persistencia de estado
         setTimeout(() => {
-          window.location.href = data.reviewUrl || `${ROUTES.REVIEW}?roomId=${gameState.roomId}`;
+          try {
+            // Guardar estado crítico antes de redirigir
+            localStorage.setItem('reviewTransition', 'true');
+            localStorage.setItem('reviewData', JSON.stringify(data));
+            
+            // Usar replace para mantener la conexión activa
+            const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
+            console.log('🔄 [GAME.HTML] Redirigiendo a revisión:', reviewUrl);
+            window.location.replace(reviewUrl);
+          } catch (redirectError) {
+            console.error('❌ [GAME.HTML] Error en replace, usando href:', redirectError);
+            window.location.href = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
+          }
         }, 2000);
         
       } catch (e) {
