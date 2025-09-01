@@ -44,9 +44,23 @@ class SocketManager {
     });
 
     this.socket.on(SOCKET_EVENTS.DISCONNECT, () => {
-      console.log('Desconectado del servidor');
+      console.log('🔌 [SOCKET] Desconectado del servidor');
       this.isConnected = false;
-      showNotification('Conexión perdida con el servidor', 'error');
+      
+      // SOLUCIÓN RESILIENTE: Reconexión automática para transiciones críticas
+      const isReviewTransition = localStorage.getItem('reviewTransition') === 'true';
+      const currentPage = window.location.pathname;
+      
+      if (isReviewTransition || currentPage.includes('review.html')) {
+        console.log('🔄 [SOCKET] Desconexión durante revisión - reconexión automática en 2s...');
+        showNotification('Reconectando automáticamente...', 'warning');
+        
+        setTimeout(() => {
+          this.attemptReconnection();
+        }, 2000);
+      } else {
+        showNotification('Conexión perdida con el servidor', 'error');
+      }
     });
 
     this.socket.on(SOCKET_EVENTS.ERROR, (error) => {
@@ -249,6 +263,44 @@ class SocketManager {
    */
   finishReview() {
     this.emit(SOCKET_EVENTS.FINISH_REVIEW);
+  }
+  
+  /**
+   * SOLUCIÓN RESILIENTE: Intenta reconexión automática
+   */
+  attemptReconnection() {
+    console.log('🔄 [SOCKET] Intentando reconexión automática...');
+    
+    try {
+      const roomId = localStorage.getItem('currentRoomId') || localStorage.getItem('roomId');
+      const username = localStorage.getItem('username');
+      
+      if (roomId && username) {
+        console.log('🔄 [SOCKET] Reconectando jugador:', { roomId, username });
+        
+        // Forzar reconexión del socket
+        if (this.socket) {
+          this.socket.connect();
+        }
+        
+        // Esperar a que se conecte y luego reconectar al jugador
+        setTimeout(() => {
+          if (this.isConnected) {
+            this.reconnectPlayer({ roomId, playerName: username });
+            this.getRoomState({ roomId });
+            console.log('✅ [SOCKET] Reconexión exitosa');
+            showNotification('Reconectado exitosamente', 'success');
+          } else {
+            console.log('❌ [SOCKET] Reconexión fallida, reintentando...');
+            this.attemptReconnection();
+          }
+        }, 1000);
+      } else {
+        console.log('❌ [SOCKET] No hay datos de sala para reconexión');
+      }
+    } catch (error) {
+      console.error('❌ [SOCKET] Error en reconexión automática:', error);
+    }
   }
 }
 

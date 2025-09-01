@@ -165,12 +165,65 @@
         
         // Configurar eventos Socket.IO
         function setupSocketListeners() {
+            // SOLUCIÓN RESILIENTE: Detectar transición de revisión
+            const isReviewTransition = localStorage.getItem('reviewTransition') === 'true';
+            const reviewData = localStorage.getItem('reviewData');
+            
+            if (isReviewTransition && reviewData) {
+                console.log('🔄 [REVIEW.HTML] Detectada transición de revisión, restaurando estado...');
+                try {
+                    const parsedData = JSON.parse(reviewData);
+                    reviewState.initialize({
+                        roomId: parsedData.roomId,
+                        round: parsedData.round,
+                        letter: parsedData.letter,
+                        players: [],
+                        allWords: {},
+                        votes: {},
+                        voteProgress: {},
+                        timeRemaining: 60,
+                        totalTime: 60,
+                        phase: 'voting'
+                    });
+                    
+                    // Limpiar datos de transición
+                    localStorage.removeItem('reviewTransition');
+                    localStorage.removeItem('reviewData');
+                    
+                    console.log('✅ [REVIEW.HTML] Estado restaurado exitosamente');
+                } catch (error) {
+                    console.error('❌ [REVIEW.HTML] Error restaurando estado:', error);
+                }
+            }
+            
             // Escuchar inicio de revisión (para reconexiones)
             socketManager.on(SOCKET_EVENTS.START_REVIEW, (data) => {
-                console.log('🔄 Recibido startReview en review.html:', data);
-                // Si ya estamos en review.html, inicializar la interfaz básica
-                if (reviewState.roomId) {
-                    reviewUI.initializeFromStartReview(data);
+                console.log('🔄 [REVIEW.HTML] Recibido startReview:', data);
+                try {
+                    // Si ya estamos en review.html, inicializar la interfaz básica
+                    if (reviewState.roomId) {
+                        console.log('🔄 [REVIEW.HTML] Inicializando desde startReview existente');
+                        reviewUI.initializeFromStartReview(data);
+                    } else {
+                        console.log('🔄 [REVIEW.HTML] Primera vez recibiendo startReview');
+                        // Inicializar estado básico
+                        reviewState.initialize({
+                            roomId: data.roomId,
+                            round: data.round,
+                            letter: data.letter,
+                            players: [],
+                            allWords: {},
+                            votes: {},
+                            voteProgress: {},
+                            timeRemaining: 60,
+                            totalTime: 60,
+                            phase: 'voting'
+                        });
+                    }
+                } catch (error) {
+                    console.error('❌ [REVIEW.HTML] Error procesando startReview:', error);
+                    // NO desconectar - solo mostrar error
+                    uiManager.showNotification('Error al procesar revisión, reintentando...', 'warning');
                 }
             });
             

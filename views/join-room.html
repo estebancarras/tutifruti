@@ -412,14 +412,37 @@
       socketManager.on(SOCKET_EVENTS.ROUND_START, handleGameStart);
       
       // Manejar inicio de revisión social
-      socketManager.on(SOCKET_EVENTS.START_REVIEW, (data) => {
-        console.log('Redirigiendo a revisión desde join-room:', data);
-        showNotification(data.message || 'Iniciando revisión de palabras...', 'info');
-        const roomId = storage.getCurrentRoomId();
-        setTimeout(() => {
-          window.location.href = data.reviewUrl || `${ROUTES.REVIEW}?roomId=${roomId}`;
-        }, 1500);
-      });
+                  socketManager.on(SOCKET_EVENTS.START_REVIEW, (data) => {
+              console.log('🔄 [JOIN-ROOM] Recibido startReview, redirigiendo a revisión:', data);
+              try {
+                showNotification(data.message || 'Iniciando revisión de palabras...', 'info');
+                const roomId = storage.getCurrentRoomId();
+                
+                // Verificar que tenemos la URL correcta
+                const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${roomId}`;
+                console.log('🔄 [JOIN-ROOM] URL de revisión:', reviewUrl);
+                
+                setTimeout(() => {
+                  console.log('🔄 [JOIN-ROOM] Ejecutando redirección...');
+                  
+                  // SOLUCIÓN DE EMERGENCIA: Usar replace en lugar de href para evitar desconexión
+                  try {
+                    // Guardar estado crítico antes de redirigir
+                    localStorage.setItem('reviewTransition', 'true');
+                    localStorage.setItem('reviewData', JSON.stringify(data));
+                    
+                    // Usar replace para mantener la conexión activa
+                    window.location.replace(reviewUrl);
+                  } catch (redirectError) {
+                    console.error('❌ [JOIN-ROOM] Error en replace, usando href:', redirectError);
+                    window.location.href = reviewUrl;
+                  }
+                }, 1500);
+              } catch (error) {
+                console.error('❌ [JOIN-ROOM] Error en redirección:', error);
+                showNotification('Error al redirigir, reintentando...', 'error');
+              }
+            });
     }
 
     function handleJoinByCode(e) {

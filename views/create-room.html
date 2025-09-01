@@ -508,13 +508,36 @@
       });
       
       // Manejar inicio de revisión social
-      socketManager.on(SOCKET_EVENTS.START_REVIEW, (data) => {
-        console.log('Redirigiendo a revisión desde create-room:', data);
-        showNotification(data.message || 'Iniciando revisión de palabras...', 'info');
-        setTimeout(() => {
-          window.location.href = data.reviewUrl || `${ROUTES.REVIEW}?roomId=${roomData.roomId}`;
-        }, 1500);
-      });
+                  socketManager.on(SOCKET_EVENTS.START_REVIEW, (data) => {
+              console.log('🔄 [CREATE-ROOM] Recibido startReview, redirigiendo a revisión:', data);
+              try {
+                showNotification(data.message || 'Iniciando revisión de palabras...', 'info');
+                
+                // Verificar que tenemos la URL correcta
+                const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${roomData.roomId}`;
+                console.log('🔄 [CREATE-ROOM] URL de revisión:', reviewUrl);
+                
+                setTimeout(() => {
+                  console.log('🔄 [CREATE-ROOM] Ejecutando redirección...');
+                  
+                  // SOLUCIÓN DE EMERGENCIA: Usar replace en lugar de href para evitar desconexión
+                  try {
+                    // Guardar estado crítico antes de redirigir
+                    localStorage.setItem('reviewTransition', 'true');
+                    localStorage.setItem('reviewData', JSON.stringify(data));
+                    
+                    // Usar replace para mantener la conexión activa
+                    window.location.replace(reviewUrl);
+                  } catch (redirectError) {
+                    console.error('❌ [CREATE-ROOM] Error en replace, usando href:', redirectError);
+                    window.location.href = reviewUrl;
+                  }
+                }, 1500);
+              } catch (error) {
+                console.error('❌ [CREATE-ROOM] Error en redirección:', error);
+                showNotification('Error al redirigir, reintentando...', 'error');
+              }
+            });
     }
 
     function handleCreateRoom(e) {
