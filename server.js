@@ -74,7 +74,7 @@ const io = new Server(server, {
   // Configuración optimizada para Render
   pingTimeout: 30000, // 30 segundos (más corto)
   pingInterval: 15000, // 15 segundos (más frecuente)
-  transports: ['websocket'], // Solo websocket para mejor performance
+  transports: ['websocket', 'polling'], // Permitir ambos transportes
   allowEIO3: true,
   maxHttpBufferSize: 512000 // 512KB buffer (más pequeño)
 });
@@ -91,6 +91,8 @@ io.use((socket, next) => {
   
   // Log de conexión
   console.log(`🔌 [SOCKET] Nuevo cliente conectado: ${socket.id}`);
+  console.log(`🔌 [SOCKET] Headers:`, socket.request.headers);
+  console.log(`🔌 [SOCKET] Transport:`, socket.conn.transport.name);
   
   next();
 });
@@ -174,6 +176,34 @@ app.use('/utils', express.static(__dirname + '/utils'));
 app.use('/views', express.static(__dirname + '/views'));
 app.use('/', express.static(__dirname)); // raíz para index.html
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    socketConnections: io.engine.clientsCount
+  });
+});
+
+// Socket.IO status endpoint
+app.get('/socket-status', (req, res) => {
+  res.json({
+    socketIO: {
+      connected: true,
+      transports: ['websocket', 'polling'],
+      pingTimeout: 30000,
+      pingInterval: 15000
+    },
+    server: {
+      timestamp: new Date().toISOString(),
+      activeRooms: activeRooms.length,
+      gameStates: Object.keys(gameStates).length
+    }
+  });
+});
+
 // Ruta explícita para vistas HTML para evitar duplicaciones o 404
 app.get(['/views/create-room.html', '/views/join-room.html', '/views/game.html', '/views/review.html', '/views/results.html'], (req, res) => {
   res.sendFile(__dirname + req.path);
@@ -221,9 +251,16 @@ const createGameState = (roomId, maxPlayers = 5) => {
   };
 };
 
+// Manejador de errores global para Socket.IO
+io.engine.on('connection_error', (err) => {
+  console.error('❌ [SOCKET.IO] Error de conexión:', err);
+});
+
 // Manejar conexiones de Socket.io
 io.on('connection', (socket) => {
-  console.log('Nuevo cliente conectado:', socket.id);
+  console.log('🔌 [CONNECTION] Nuevo cliente conectado:', socket.id);
+  console.log('🔌 [CONNECTION] Transport usado:', socket.conn.transport.name);
+  console.log('🔌 [CONNECTION] Headers de conexión:', Object.keys(socket.request.headers));
   
   // Configurar heartbeat para este socket
   const heartbeatInterval = setInterval(() => {
@@ -244,6 +281,11 @@ io.on('connection', (socket) => {
   socket.on('heartbeat_ack', (data) => {
     // Cliente respondió al heartbeat, conexión está activa
     socket.lastHeartbeat = Date.now();
+  });
+  
+  // Manejar errores del socket
+  socket.on('error', (error) => {
+    console.error('❌ [SOCKET] Error en socket:', socket.id, error);
   });
   
   // Manejar solicitud de salas activas
