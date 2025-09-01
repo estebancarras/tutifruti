@@ -19,7 +19,7 @@ test.describe('Flujo del botón ¡BASTA!', () => {
     try {
       // ===== HOST: CREAR SALA =====
       console.log('📱 Host creando sala...');
-      await host.goto('http://localhost:3000', { timeout: 10000 });
+      await host.goto('https://tutifruti-3ii6.onrender.com', { timeout: 15000 });
       await host.fill('#username', 'host-basta');
       await host.click('#createRoomButton');
       
@@ -33,7 +33,7 @@ test.describe('Flujo del botón ¡BASTA!', () => {
       
       // ===== GUEST: UNIRSE A SALA =====
       console.log('👥 Invitado uniéndose...');
-      await guest.goto('http://localhost:3000', { timeout: 10000 });
+      await guest.goto('https://tutifruti-3ii6.onrender.com', { timeout: 15000 });
       await guest.fill('#username', 'guest-basta');
       await guest.click('#joinRoomButton');
       
@@ -180,7 +180,7 @@ test.describe('Flujo del botón ¡BASTA!', () => {
     
     try {
       // Crear sala y iniciar juego
-      await page.goto('http://localhost:3000', { timeout: 10000 });
+      await page.goto('https://tutifruti-3ii6.onrender.com', { timeout: 15000 });
       await page.fill('#username', 'test-incomplete');
       await page.click('#createRoomButton');
       
