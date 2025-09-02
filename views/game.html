@@ -571,6 +571,15 @@
           }
         }, 100);
 
+        // FASE 4: Manejar Letter Streak System si existe
+        if (data.streakBonuses && Object.keys(data.streakBonuses).length > 0) {
+          handleLetterStreakBonus(data);
+        }
+        
+        if (data.isRare || data.isMedium) {
+          highlightSpecialLetter(data.letter, data.isRare ? 'rare' : 'medium');
+        }
+        
         showNotification(`¡Ronda ${data.round} iniciada con letra ${data.letter}!`, 'success');
         uiManager.announce(`Ronda ${data.round} iniciada con letra ${data.letter}. ¡Tiempo para escribir!`);
       } catch (e) {
@@ -619,13 +628,7 @@
       }
     }
 
-    function handleVoteUpdate(data) {
-      try {
-        uiManager.updateVoteCounts(data);
-      } catch (e) {
-        console.error('Error en handleVoteUpdate:', e);
-      }
-    }
+    // Función handleVoteUpdate removida - duplicada, se usa la versión más completa en línea 1195
 
     function handleReviewEnded(data) {
       try {
@@ -1891,16 +1894,7 @@
         }
       });
       
-      // FASE 4: Handler para Letter Streak System
-      socketManager.on('roundStart', (data) => {
-        if (data.streakBonuses && Object.keys(data.streakBonuses).length > 0) {
-          handleLetterStreakBonus(data);
-        }
-        
-        if (data.isRare || data.isMedium) {
-          highlightSpecialLetter(data.letter, data.isRare ? 'rare' : 'medium');
-        }
-      });
+      // FASE 4: Handler para Letter Streak System - Movido a handleRoundStart principal
     }
     
     // FASE 4: LETTER STREAK SYSTEM - Indicadores visuales

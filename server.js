@@ -579,6 +579,7 @@ io.on('connection', (socket) => {
     gameState.isPlaying = true;
     gameState.currentRound = 1;
     gameState.roundPhase = 'writing';
+    gameState.gameStartedAt = Date.now(); // Para estadísticas
     
     // FASE 4: Generar letra con sistema de racha
     const letterData = generateLetterWithHistory(gameState);
@@ -767,14 +768,17 @@ io.on('connection', (socket) => {
       gameState.currentRound++;
       gameState.players.forEach(p => p.ready = false);
       
-      // Seleccionar nueva letra
-      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+      // FASE 4: Generar letra con sistema de racha
+      const letterData = generateLetterWithHistory(gameState);
       
       // Notificar a todos los jugadores
       io.to(roomId).emit('newRound', {
-        letter: gameState.currentLetter,
+        letter: letterData.letter,
         timeLimit: gameState.timeLimit,
+        streakBonuses: letterData.streakBonuses,
+        letterHistory: letterData.letterHistory,
+        isRare: letterData.isRare,
+        isMedium: letterData.isMedium,
         round: gameState.currentRound,
         scores: gameState.scores
       });
@@ -873,14 +877,17 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Iniciar siguiente ronda automáticamente con nueva letra
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+    // FASE 4: Iniciar siguiente ronda automáticamente con nueva letra
+    const letterData = generateLetterWithHistory(gameState);
     gameState.roundPhase = 'roundStart';
     
     io.to(roomId).emit('roundStart', {
-      letter: gameState.currentLetter,
+      letter: letterData.letter,
       timeLimit: gameState.timeLimit,
+      streakBonuses: letterData.streakBonuses,
+      letterHistory: letterData.letterHistory,
+      isRare: letterData.isRare,
+      isMedium: letterData.isMedium,
       round: gameState.currentRound,
       categories: gameState.categories
     });
@@ -1191,15 +1198,18 @@ io.on('connection', (socket) => {
         gameState.timeRemaining = gameState.timeLimit;
         gameState.roundPhase = 'roundStart';
         
-        // Auto-generar nueva letra
-        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+        // FASE 4: Auto-generar nueva letra con sistema de racha
+        const letterData = generateLetterWithHistory(gameState);
         
         // Notificar nueva ronda después de un breve delay
         setTimeout(() => {
           io.to(roomId).emit('roundStart', {
-            letter: gameState.currentLetter,
+            letter: letterData.letter,
             timeLimit: gameState.timeLimit,
+            streakBonuses: letterData.streakBonuses,
+            letterHistory: letterData.letterHistory,
+            isRare: letterData.isRare,
+            isMedium: letterData.isMedium,
             round: gameState.currentRound,
             categories: gameState.categories
           });
@@ -1428,15 +1438,18 @@ function startTimer(roomId) {
       gameState.timeRemaining = gameState.timeLimit;
           gameState.timerEndsAt = null;
           
-          // NUEVO FLUJO: Auto-letter para siguiente ronda
-          const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-          gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+          // FASE 4: NUEVO FLUJO: Auto-letter para siguiente ronda con sistema de racha
+          const letterData = generateLetterWithHistory(gameState);
           gameState.roundPhase = 'writing';
           
           // Emit directo sin ruleta
           io.to(roomId).emit('roundStart', {
-            letter: gameState.currentLetter,
+            letter: letterData.letter,
             timeLimit: gameState.timeLimit,
+            streakBonuses: letterData.streakBonuses,
+            letterHistory: letterData.letterHistory,
+            isRare: letterData.isRare,
+            isMedium: letterData.isMedium,
             round: gameState.currentRound,
             categories: gameState.categories
           });
@@ -1704,15 +1717,18 @@ function finishReviewAutomatically(roomId) {
     gameState.timeRemaining = gameState.timeLimit;
     gameState.roundPhase = 'roundStart';
     
-    // Auto-generar nueva letra
-    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+    // FASE 4: Auto-generar nueva letra con sistema de racha
+    const letterData = generateLetterWithHistory(gameState);
     
     // Notificar nueva ronda después de un breve delay
     setTimeout(() => {
       io.to(roomId).emit('roundStart', {
-        letter: gameState.currentLetter,
+        letter: letterData.letter,
         timeLimit: gameState.timeLimit,
+        streakBonuses: letterData.streakBonuses,
+        letterHistory: letterData.letterHistory,
+        isRare: letterData.isRare,
+        isMedium: letterData.isMedium,
         round: gameState.currentRound,
         categories: gameState.categories
       });
