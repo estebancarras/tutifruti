@@ -315,18 +315,47 @@ io.on('connection', (socket) => {
       return socket.emit('error', { message: 'La sala no existe' });
     }
     
-    // Enviar estado completo de la sala (solo jugadores conectados)
-    socket.emit('roomState', {
-      roomId: gameState.roomId,
-      players: getConnectedPlayers(gameState),
-      isPlaying: gameState.isPlaying,
-      currentRound: gameState.currentRound,
-      currentLetter: gameState.currentLetter,
-      timeRemaining: gameState.timeRemaining,
-      categories: gameState.categories,
-      serverTime: Date.now(),
-      timerEndsAt: gameState.timerEndsAt || null
-    });
+    // Si estamos en fase de revisión, enviar datos de revisión
+    if (gameState.roundPhase === 'review' && gameState.reviewData) {
+      console.log('📊 [getRoomState] Enviando datos de revisión:', {
+        roomId,
+        playersCount: gameState.players.length,
+        reviewData: !!gameState.reviewData,
+        words: Object.keys(gameState.words || {}),
+        categories: gameState.categories?.length || 0
+      });
+      
+      socket.emit('reviewData', {
+        roomId: gameState.roomId,
+        round: gameState.currentRound,
+        letter: gameState.currentLetter,
+        players: gameState.players.map(player => ({
+          name: player.name,
+          id: player.id,
+          words: gameState.categories.map(category => ({
+            category,
+            word: gameState.words[player.name]?.[category] || '',
+            isValid: gameState.validWords[player.name]?.[category] !== false
+          }))
+        })),
+        currentPlayerIndex: gameState.reviewData.currentPlayerIndex || 0,
+        voteProgress: gameState.reviewData.voteProgress || {},
+        phase: 'voting'
+      });
+    } else {
+      // Enviar estado completo de la sala (solo jugadores conectados)
+      socket.emit('roomState', {
+        roomId: gameState.roomId,
+        players: getConnectedPlayers(gameState),
+        isPlaying: gameState.isPlaying,
+        currentRound: gameState.currentRound,
+        currentLetter: gameState.currentLetter,
+        timeRemaining: gameState.timeRemaining,
+        categories: gameState.categories,
+        serverTime: Date.now(),
+        timerEndsAt: gameState.timerEndsAt || null
+      });
+    }
     
     logEvent({ socket, event: 'getRoomState', roomId, message: 'Estado de sala enviado' });
   });
