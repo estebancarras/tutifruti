@@ -595,24 +595,27 @@
         // Mostrar notificación de transición
         showNotification(data.message || '¡Hora de revisar las palabras!', 'info');
         
-        // SOLUCIÓN ROBUSTA: Prevenir desconexión durante transición
+        // SOLUCIÓN DEFINITIVA: Cargar revisión en la misma página
         try {
-          // Guardar estado crítico antes de redirigir
+          console.log('🔄 [GAME.HTML] Cargando revisión en la misma página...');
+          
+          // Guardar estado crítico
           localStorage.setItem('reviewTransition', 'true');
           localStorage.setItem('reviewData', JSON.stringify(data));
           
-          // Marcar que estamos en transición para evitar desconexión
-          localStorage.setItem('socketTransition', 'true');
+          // Ocultar interfaz de juego
+          const gameContainer = document.querySelector('.game-container');
+          if (gameContainer) {
+            gameContainer.style.display = 'none';
+          }
           
-          // Usar replace para mantener la conexión activa
-          const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
-          console.log('🔄 [GAME.HTML] Redirigiendo a revisión INMEDIATAMENTE:', reviewUrl);
+          // Cargar revisión dinámicamente
+          loadReviewInterface(data);
           
-          // Redirección inmediata sin timeout
-          window.location.replace(reviewUrl);
-        } catch (redirectError) {
-          console.error('❌ [GAME.HTML] Error en replace, usando href:', redirectError);
-          window.location.href = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
+        } catch (error) {
+          console.error('❌ [GAME.HTML] Error cargando revisión:', error);
+          // Fallback: mostrar mensaje de error
+          showNotification('Error al cargar revisión', 'error');
         }
         
       } catch (e) {
@@ -694,6 +697,58 @@
       
       if (nextIndex < wordInputs.length && !wordInputs[nextIndex].disabled) {
         wordInputs[nextIndex].focus();
+      }
+    }
+    
+    // SOLUCIÓN DEFINITIVA: Cargar interfaz de revisión en la misma página
+    function loadReviewInterface(data) {
+      try {
+        console.log('🔄 [GAME.HTML] Implementando interfaz de revisión...');
+        
+        // Crear contenedor de revisión
+        const reviewContainer = document.createElement('div');
+        reviewContainer.id = 'review-container';
+        reviewContainer.innerHTML = `
+          <div style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            color: white;
+            font-size: 24px;
+            text-align: center;
+          ">
+            <div>
+              <div style="font-size: 48px; margin-bottom: 20px;">🔍</div>
+              <div>Revisión de palabras</div>
+              <div style="font-size: 16px; margin-top: 10px;">Ronda ${data.round} - Letra ${data.letter}</div>
+              <div style="font-size: 14px; margin-top: 20px; opacity: 0.8;">
+                Manteniendo conexión activa...<br>
+                Redirigiendo a página de revisión en 3 segundos
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(reviewContainer);
+        
+        // Redirigir después de 3 segundos para dar tiempo a que se establezca la conexión
+        setTimeout(() => {
+          console.log('🔄 [GAME.HTML] Redirigiendo a review.html...');
+          const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
+          window.location.href = reviewUrl;
+        }, 3000);
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error en loadReviewInterface:', error);
+        // Fallback: redirección directa
+        const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
+        window.location.href = reviewUrl;
       }
     }
 
