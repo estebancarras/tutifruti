@@ -949,14 +949,18 @@
             const word = player.words?.find(w => w.category === category);
             if (!word) return;
             
+            // LÓGICA JUSTA: Verificar si el usuario actual es el autor de esta palabra
+            const isOwnWord = player.name === votingState.currentUser;
+            
             const playerVoteCard = document.createElement('div');
             playerVoteCard.style.cssText = `
-              background: white;
-              border: 2px solid #e0e0e0;
+              background: ${isOwnWord ? 'linear-gradient(135deg, #fff3e0, #ffe0b2)' : 'white'};
+              border: 2px solid ${isOwnWord ? '#ff9800' : '#e0e0e0'};
               border-radius: 15px;
               padding: 20px;
               transition: all 0.3s ease;
               box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+              ${isOwnWord ? 'opacity: 0.8;' : ''}
             `;
             
             // Avatares simples pero consistentes con nuestro estilo
@@ -991,10 +995,10 @@
                 </div>
                 <div>
                   <div style="font-weight: 700; color: #333; font-size: 18px;">
-                    ${player.name}
+                    ${player.name} ${isOwnWord ? '(Tú)' : ''}
                   </div>
-                  <div style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">
-                    Jugador ${playerIndex + 1}
+                  <div style="font-size: 12px; color: ${isOwnWord ? '#ff9800' : '#888'}; text-transform: uppercase; letter-spacing: 0.5px;">
+                    ${isOwnWord ? '🚫 No puedes votar tu propia palabra' : `Jugador ${playerIndex + 1}`}
                   </div>
                 </div>
               </div>
@@ -1021,72 +1025,92 @@
                 </div>
               </div>
               
-              <!-- Sistema de votación adaptado -->
+              <!-- Sistema de votación adaptado - LÓGICA JUSTA -->
               <div style="
                 display: flex;
                 gap: 15px;
                 justify-content: center;
                 align-items: center;
               ">
-                <!-- Botón VÁLIDA -->
-                <button 
-                  id="vote-valid-${player.name}-${category}"
-                  onclick="castVoteForWord('${player.name}', '${category}', true)"
-                  style="
-                    background: linear-gradient(135deg, #4CAF50, #45a049);
-                    color: white;
-                    border: none;
-                    width: 55px;
-                    height: 55px;
+                ${isOwnWord ? `
+                  <!-- Palabras propias: Solo mostrar indicadores, no botones -->
+                  <div style="
+                    background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+                    border: 2px solid #FF9800;
                     border-radius: 15px;
-                    font-size: 24px;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
-                    font-weight: bold;
-                  "
-                  onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(76, 175, 80, 0.5)'"
-                  onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 4px 15px rgba(76, 175, 80, 0.4)'"
-                >
-                  ✓
-                </button>
-                
-                <!-- Indicador de votos con nuestro estilo -->
-                <div id="vote-indicator-${player.name}-${category}" style="
-                  display: flex;
-                  flex-direction: column;
-                  gap: 5px;
-                  min-width: 70px;
-                  align-items: center;
-                  font-size: 14px;
-                  color: #666;
-                ">
-                  <div style="font-weight: 600;">Votos</div>
-                  <div id="vote-count-${player.name}-${category}">0/0</div>
-                </div>
-                
-                <!-- Botón INVÁLIDA -->
-                <button 
-                  id="vote-invalid-${player.name}-${category}"
-                  onclick="castVoteForWord('${player.name}', '${category}', false)"
-                  style="
-                    background: linear-gradient(135deg, #f44336, #d32f2f);
-                    color: white;
-                    border: none;
-                    width: 55px;
-                    height: 55px;
-                    border-radius: 15px;
-                    font-size: 24px;
-                    cursor: pointer;
-                    transition: all 0.3s ease;
-                    box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
-                    font-weight: bold;
-                  "
-                  onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(244, 67, 54, 0.5)'"
-                  onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 4px 15px rgba(244, 67, 54, 0.4)'"
-                >
-                  ✗
-                </button>
+                    padding: 20px;
+                    text-align: center;
+                    min-width: 200px;
+                    color: #E65100;
+                    font-weight: 600;
+                  ">
+                    <div style="font-size: 16px; margin-bottom: 8px;">🔒 Tu palabra</div>
+                    <div style="font-size: 14px;">Esperando votos de otros jugadores</div>
+                    <div id="vote-count-${player.name}-${category}" style="font-size: 12px; margin-top: 8px; color: #666;">
+                      0/0 votos recibidos
+                    </div>
+                  </div>
+                ` : `
+                  <!-- Palabras de otros: Botones de votación normales -->
+                  <button 
+                    id="vote-valid-${player.name}-${category}"
+                    onclick="castVoteForWord('${player.name}', '${category}', true)"
+                    style="
+                      background: linear-gradient(135deg, #4CAF50, #45a049);
+                      color: white;
+                      border: none;
+                      width: 55px;
+                      height: 55px;
+                      border-radius: 15px;
+                      font-size: 24px;
+                      cursor: pointer;
+                      transition: all 0.3s ease;
+                      box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+                      font-weight: bold;
+                    "
+                    onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(76, 175, 80, 0.5)'"
+                    onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 4px 15px rgba(76, 175, 80, 0.4)'"
+                  >
+                    ✓
+                  </button>
+                  
+                  <!-- Indicador de votos con nuestro estilo -->
+                  <div id="vote-indicator-${player.name}-${category}" style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
+                    min-width: 70px;
+                    align-items: center;
+                    font-size: 14px;
+                    color: #666;
+                  ">
+                    <div style="font-weight: 600;">Votos</div>
+                    <div id="vote-count-${player.name}-${category}">0/0</div>
+                  </div>
+                  
+                  <!-- Botón INVÁLIDA -->
+                  <button 
+                    id="vote-invalid-${player.name}-${category}"
+                    onclick="castVoteForWord('${player.name}', '${category}', false)"
+                    style="
+                      background: linear-gradient(135deg, #f44336, #d32f2f);
+                      color: white;
+                      border: none;
+                      width: 55px;
+                      height: 55px;
+                      border-radius: 15px;
+                      font-size: 24px;
+                      cursor: pointer;
+                      transition: all 0.3s ease;
+                      box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+                      font-weight: bold;
+                    "
+                    onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(244, 67, 54, 0.5)'"
+                    onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 4px 15px rgba(244, 67, 54, 0.4)'"
+                  >
+                    ✗
+                  </button>
+                `}
               </div>
             `;
             
@@ -1182,7 +1206,7 @@
         votingState.currentUser = gameState.playerName;
         votingState.votes = {};
         
-        // Inicializar votos para cada palabra
+        // Inicializar votos para cada palabra - CON MEJORAS
         data.players?.forEach(player => {
           player.words?.forEach(word => {
             const key = `${player.name}-${word.category}`;
@@ -1192,10 +1216,16 @@
               userVote: null,
               word: word.word,
               player: player.name,
-              category: word.category
+              category: word.category,
+              isOwnWord: player.name === votingState.currentUser, // Flag para palabras propias
+              isEmpty: !word.word || word.word.trim() === '', // Flag para palabras vacías
+              createdAt: Date.now() // Timestamp para ordenamiento
             };
           });
         });
+        
+        // Guardar letra actual para progreso
+        votingState.currentLetter = data.letter;
         
         console.log('✅ [GAME.HTML] Estado de votación inicializado:', votingState);
         
@@ -1204,10 +1234,17 @@
       }
     }
     
-    // Función global para votar (llamada desde onclick)
+    // Función global para votar (llamada desde onclick) - CON LÓGICA JUSTA
     window.castVoteForWord = function(playerName, category, isValid) {
       try {
-        console.log(`🗳️ [GAME.HTML] Votando: ${playerName}-${category} = ${isValid ? 'VÁLIDA' : 'INVÁLIDA'}`);
+        console.log(`🗳️ [GAME.HTML] Intento de voto: ${playerName}-${category} = ${isValid ? 'VÁLIDA' : 'INVÁLIDA'}`);
+        
+        // VERIFICACIÓN CRÍTICA: No permitir votar por palabras propias
+        if (playerName === votingState.currentUser) {
+          console.warn('🚫 [GAME.HTML] Intento de voto por palabra propia bloqueado');
+          showNotification('No puedes votar por tu propia palabra', 'warning');
+          return;
+        }
         
         const key = `${playerName}-${category}`;
         const voteData = votingState.votes[key];
@@ -1234,6 +1271,8 @@
           voteData.invalid++;
         }
         
+        console.log(`✅ [GAME.HTML] Voto registrado: ${playerName}-${category} = ${isValid ? 'VÁLIDA' : 'INVÁLIDA'}`);
+        
         // Actualizar UI
         updateVoteUI(playerName, category);
         
@@ -1251,6 +1290,7 @@
         
       } catch (error) {
         console.error('❌ [GAME.HTML] Error al votar:', error);
+        showNotification('Error al procesar voto', 'error');
       }
     };
     
@@ -1308,26 +1348,57 @@
       }
     }
     
-    // Verificar progreso de votación
+    // Verificar progreso de votación - LÓGICA JUSTA
     function checkVotingProgress() {
       try {
-        const totalWords = Object.keys(votingState.votes).length;
-        const votedWords = Object.values(votingState.votes).filter(v => v.userVote !== null).length;
+        // Contar solo palabras de OTROS jugadores (no las propias)
+        const otherPlayersWords = Object.values(votingState.votes).filter(v => v.player !== votingState.currentUser);
+        const totalVotableWords = otherPlayersWords.length;
+        const votedWords = otherPlayersWords.filter(v => v.userVote !== null).length;
         
-        console.log(`📊 [GAME.HTML] Progreso de votación: ${votedWords}/${totalWords} palabras votadas`);
+        console.log(`📊 [GAME.HTML] Progreso de votación JUSTO: ${votedWords}/${totalVotableWords} palabras votadas (excluyendo propias)`);
         
         // Actualizar botón de confirmación
         const confirmBtn = document.getElementById('confirm-votes-btn');
         if (confirmBtn) {
-          if (votedWords === totalWords) {
+          if (totalVotableWords === 0) {
+            // Solo hay palabras propias (caso especial: 1 jugador)
+            confirmBtn.style.background = 'linear-gradient(135deg, #9E9E9E, #757575)';
+            confirmBtn.innerHTML = '⏸️ No hay palabras para votar';
+            confirmBtn.disabled = true;
+          } else if (votedWords === totalVotableWords) {
             confirmBtn.style.background = 'linear-gradient(135deg, #4CAF50, #45a049)';
             confirmBtn.innerHTML = '✅ Confirmar Votación Completa';
             confirmBtn.disabled = false;
           } else {
             confirmBtn.style.background = 'linear-gradient(135deg, #FF9800, #F57C00)';
-            confirmBtn.innerHTML = `⏳ Votar Restantes (${votedWords}/${totalWords})`;
+            confirmBtn.innerHTML = `⏳ Votar Restantes (${votedWords}/${totalVotableWords})`;
             confirmBtn.disabled = false; // Permitir confirmación parcial
           }
+        }
+        
+        // Actualizar estadísticas en el header
+        const statusDiv = document.getElementById('review-status');
+        if (statusDiv && totalVotableWords > 0) {
+          const progressPercentage = Math.round((votedWords / totalVotableWords) * 100);
+          statusDiv.innerHTML = `
+            <div style="color: #4CAF50; font-weight: 600; margin-bottom: 10px;">
+              ✅ ¡Datos de revisión cargados correctamente!
+            </div>
+            <div style="margin-bottom: 10px;">
+              ${votingState.totalPlayers} jugadores • ${Object.keys(votingState.votes).length} palabras totales • Letra <strong>${votingState.currentLetter || 'X'}</strong>
+            </div>
+            <div style="
+              background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(76, 175, 80, 0.2));
+              border-radius: 20px;
+              padding: 10px;
+              border: 1px solid rgba(76, 175, 80, 0.3);
+              color: #2E7D32;
+              font-weight: 600;
+            ">
+              📊 Progreso: ${votedWords}/${totalVotableWords} votos (${progressPercentage}%)
+            </div>
+          `;
         }
         
       } catch (error) {
