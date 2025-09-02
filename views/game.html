@@ -700,7 +700,7 @@
       try {
         console.log('🔄 [GAME.HTML] Creando interfaz de revisión NATIVA...');
         
-        // Crear contenedor de revisión COMPLETO
+        // Crear contenedor de revisión manteniendo la ESENCIA del proyecto
         const reviewContainer = document.createElement('div');
         reviewContainer.id = 'native-review-container';
         reviewContainer.innerHTML = `
@@ -715,60 +715,114 @@
             overflow-y: auto;
             padding: 20px;
             box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
           ">
-            <!-- Header de revisión -->
+            <!-- Header del juego manteniendo nuestro estilo -->
             <div style="
               text-align: center;
               color: white;
               margin-bottom: 30px;
             ">
-              <h2 style="font-size: 32px; margin: 0;">🔍 Revisión de Palabras</h2>
-              <p style="font-size: 18px; opacity: 0.9;">Ronda ${data.round} - Letra ${data.letter}</p>
-              <div id="review-status" style="font-size: 16px; opacity: 0.8;">Esperando datos de revisión...</div>
+              <h2 style="font-size: 32px; margin: 0 0 10px 0; text-shadow: 0 2px 4px rgba(0,0,0,0.3);">
+                🔍 Revisión Social de Palabras
+              </h2>
+              <div style="
+                display: flex;
+                justify-content: center;
+                gap: 30px;
+                font-size: 18px;
+                font-weight: 600;
+                text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+              ">
+                <span>Ronda: <strong>${data.round || 1}</strong></span>
+                <span>Letra: <strong>${data.letter || 'X'}</strong></span>
+              </div>
             </div>
             
-            <!-- Lista de jugadores y palabras -->
-            <div id="players-review-grid" style="
-              display: grid;
-              gap: 20px;
-              max-width: 1200px;
-              margin: 0 auto;
-              grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            <!-- Panel de instrucciones con nuestro estilo -->
+            <div style="
+              background: rgba(255, 255, 255, 0.95);
+              border-radius: 12px;
+              padding: 20px;
+              margin: 0 auto 25px;
+              max-width: 700px;
+              color: #333;
+              font-size: 16px;
+              text-align: center;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+              border: 2px solid rgba(255,255,255,0.3);
             ">
-              <!-- Se llenará dinámicamente -->
+              <strong>📊 Sistema de Votación Social:</strong><br>
+              Vota si cada palabra es válida (✓) o inválida (✗). Los resultados se decidirán por consenso.
             </div>
             
-            <!-- Controles de revisión -->
+            <!-- Panel principal manteniendo nuestro estilo -->
+            <div style="
+              background: rgba(255, 255, 255, 0.98);
+              border-radius: 15px;
+              padding: 30px;
+              margin: 0 auto;
+              max-width: 1000px;
+              box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+              border: 2px solid rgba(255,255,255,0.3);
+            ">
+              <div id="review-status" style="
+                text-align: center;
+                color: #666;
+                margin-bottom: 25px;
+                font-size: 16px;
+              ">Esperando datos de revisión...</div>
+              
+              <!-- Contenedor de votación -->
+              <div id="players-voting-container">
+                <!-- Se llenará dinámicamente -->
+              </div>
+              
+              <!-- Botón de confirmación con nuestro estilo -->
+              <div style="text-align: center; margin-top: 30px;">
+                <button id="confirm-votes-btn" style="
+                  background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+                  color: white;
+                  border: none;
+                  padding: 15px 40px;
+                  border-radius: 25px;
+                  font-size: 18px;
+                  font-weight: 600;
+                  cursor: pointer;
+                  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+                  transition: all 0.3s ease;
+                  text-transform: uppercase;
+                  letter-spacing: 1px;
+                " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 6px 20px rgba(76, 175, 80, 0.5)'"
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(76, 175, 80, 0.4)'">
+                  ✅ Confirmar Votación
+                </button>
+              </div>
+            </div>
+            
+            <!-- Controles de emergencia -->
             <div style="
               position: fixed;
               bottom: 20px;
-              left: 50%;
-              transform: translateX(-50%);
+              right: 20px;
               background: rgba(255, 255, 255, 0.9);
-              padding: 15px;
-              border-radius: 10px;
-              box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+              padding: 12px;
+              border-radius: 12px;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.1);
             ">
-              <button id="continue-review-btn" style="
-                background: #4CAF50;
-                color: white;
-                border: none;
-                padding: 12px 24px;
-                border-radius: 6px;
-                font-size: 16px;
-                cursor: pointer;
-                margin-right: 10px;
-              ">Continuar Revisión</button>
-              
               <button id="skip-review-btn" style="
                 background: #FF9800;
                 color: white;
                 border: none;
-                padding: 12px 24px;
-                border-radius: 6px;
-                font-size: 16px;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-size: 14px;
                 cursor: pointer;
-              ">Saltar Revisión</button>
+                transition: all 0.3s ease;
+              " onmouseover="this.style.background='#F57C00'"
+                 onmouseout="this.style.background='#FF9800'">
+                ⏭️ Saltar
+              </button>
             </div>
           </div>
         `;
@@ -792,22 +846,16 @@
     // Configurar handlers para la revisión nativa
     function setupNativeReviewHandlers(data) {
       try {
-        // Handler para continuar revisión
-        const continueBtn = document.getElementById('continue-review-btn');
-        if (continueBtn) {
-          continueBtn.addEventListener('click', () => {
-            console.log('🔄 [GAME.HTML] Usuario eligió continuar revisión...');
-            showNotification('Procesando revisión...', 'info');
-            // Aquí iría la lógica de votación en el futuro
-            
-            // Por ahora, simular revisión completada
-            setTimeout(() => {
-              finishNativeReview();
-            }, 2000);
+        // Handler para confirmar votación
+        const confirmBtn = document.getElementById('confirm-votes-btn');
+        if (confirmBtn) {
+          confirmBtn.addEventListener('click', () => {
+            console.log('🔄 [GAME.HTML] Usuario confirmó votación...');
+            confirmVotingResults();
           });
         }
         
-        // Handler para saltar revisión
+        // Handler para saltar revisión (emergencia)
         const skipBtn = document.getElementById('skip-review-btn');
         if (skipBtn) {
           skipBtn.addEventListener('click', () => {
@@ -827,7 +875,7 @@
       }
     }
     
-    // Handler para datos de revisión
+    // Handler para datos de revisión - Sistema de votación con esencia del proyecto
     function handleNativeReviewData(data) {
       try {
         console.log('📊 [GAME.HTML] Datos de revisión recibidos:', data);
@@ -835,71 +883,222 @@
         const statusDiv = document.getElementById('review-status');
         if (statusDiv) {
           statusDiv.innerHTML = `
-            <span style="color: #4CAF50;">✅ Datos cargados!</span><br>
-            Revisando palabras de ${data.players?.length || 0} jugadores
+            <div style="color: #4CAF50; font-weight: 600; margin-bottom: 10px;">
+              ✅ ¡Datos de revisión cargados correctamente!
+            </div>
+            <div>
+              ${data.players?.length || 0} jugadores • ${data.players?.[0]?.words?.length || 0} categorías • Letra <strong>${data.letter}</strong>
+            </div>
           `;
         }
         
-        const grid = document.getElementById('players-review-grid');
-        if (grid && data.players) {
-          grid.innerHTML = '';
+        // Contenedor principal de votación
+        const votingContainer = document.getElementById('players-voting-container');
+        if (!votingContainer || !data.players) return;
+        
+        votingContainer.innerHTML = '';
+        
+        // Crear grid de palabras organizado por categorías (manteniendo nuestro estilo)
+        const categories = [...new Set(data.players.flatMap(p => p.words?.map(w => w.category) || []))];
+        
+        categories.forEach((category, categoryIndex) => {
+          const categorySection = document.createElement('div');
+          categorySection.style.cssText = `
+            margin-bottom: 35px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 15px;
+            padding: 25px;
+            border: 2px solid rgba(102, 126, 234, 0.2);
+          `;
           
-          data.players.forEach(player => {
-            const playerCard = document.createElement('div');
-            playerCard.style.cssText = `
-              background: rgba(255, 255, 255, 0.95);
+          // Título de categoría con nuestro estilo
+          categorySection.innerHTML = `
+            <div style="
+              text-align: center;
+              margin-bottom: 20px;
+              padding: 15px;
+              background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
               border-radius: 10px;
+              border: 1px solid rgba(102, 126, 234, 0.3);
+            ">
+              <h3 style="
+                font-size: 22px;
+                font-weight: 700;
+                color: #333;
+                margin: 0;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+              ">
+                📝 ${category}
+              </h3>
+              <div style="font-size: 14px; color: #666; margin-top: 5px;">
+                Letra: <strong style="color: #667eea;">${data.letter}</strong>
+              </div>
+            </div>
+          `;
+          
+          // Grid de jugadores para esta categoría
+          const playersGrid = document.createElement('div');
+          playersGrid.style.cssText = `
+            display: grid;
+            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          `;
+          
+          data.players.forEach((player, playerIndex) => {
+            const word = player.words?.find(w => w.category === category);
+            if (!word) return;
+            
+            const playerVoteCard = document.createElement('div');
+            playerVoteCard.style.cssText = `
+              background: white;
+              border: 2px solid #e0e0e0;
+              border-radius: 15px;
               padding: 20px;
+              transition: all 0.3s ease;
               box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-              animation: fadeIn 0.5s ease-in;
             `;
             
-            const validWordsCount = player.words?.filter(w => w.isValid).length || 0;
-            const totalWords = player.words?.length || 0;
+            // Avatares simples pero consistentes con nuestro estilo
+            const playerColors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#fa709a', '#fee140'];
+            const playerColor = playerColors[playerIndex % playerColors.length];
+            const playerInitial = player.name.charAt(0).toUpperCase();
             
-            playerCard.innerHTML = `
-              <h3 style="margin: 0 0 15px 0; color: #333; display: flex; justify-content: space-between; align-items: center;">
-                <span>${player.name}</span>
-                <span style="font-size: 14px; background: #e3f2fd; padding: 4px 8px; border-radius: 12px;">
-                  ${validWordsCount}/${totalWords} válidas
-                </span>
-              </h3>
-              <div style="display: grid; gap: 10px;">
-                ${(player.words || []).map(word => `
-                  <div style="
-                    background: ${word.isValid ? '#e8f5e8' : '#ffeaa7'};
-                    padding: 12px;
-                    border-radius: 8px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    border-left: 4px solid ${word.isValid ? '#4CAF50' : '#FF9800'};
-                  ">
-                    <span>
-                      <strong>${word.category}:</strong> 
-                      <em>${word.word || '(vacío)'}</em>
-                    </span>
-                    <span style="color: ${word.isValid ? '#2E7D32' : '#F57C00'}; font-weight: bold;">
-                      ${word.isValid ? '✓ Válida' : '⚠ Revisar'}
-                    </span>
+            playerVoteCard.innerHTML = `
+              <!-- Header del jugador -->
+              <div style="
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                margin-bottom: 15px;
+                padding-bottom: 15px;
+                border-bottom: 2px solid #f0f0f0;
+              ">
+                <div style="
+                  width: 45px;
+                  height: 45px;
+                  background: linear-gradient(135deg, ${playerColor}, ${playerColor}cc);
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  font-size: 20px;
+                  font-weight: bold;
+                  color: white;
+                  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+                ">
+                  ${playerInitial}
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: #333; font-size: 18px;">
+                    ${player.name}
                   </div>
-                `).join('')}
+                  <div style="font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Jugador ${playerIndex + 1}
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Palabra con nuestro estilo -->
+              <div style="
+                background: linear-gradient(135deg, #f8f9ff, #f0f4ff);
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 20px;
+                border: 2px solid #e8edff;
+                text-align: center;
+              ">
+                <div style="
+                  font-size: 24px;
+                  font-weight: 700;
+                  color: #333;
+                  min-height: 30px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                ">
+                  ${word.word || '(sin respuesta)'}
+                </div>
+              </div>
+              
+              <!-- Sistema de votación adaptado -->
+              <div style="
+                display: flex;
+                gap: 15px;
+                justify-content: center;
+                align-items: center;
+              ">
+                <!-- Botón VÁLIDA -->
+                <button 
+                  id="vote-valid-${player.name}-${category}"
+                  onclick="castVoteForWord('${player.name}', '${category}', true)"
+                  style="
+                    background: linear-gradient(135deg, #4CAF50, #45a049);
+                    color: white;
+                    border: none;
+                    width: 55px;
+                    height: 55px;
+                    border-radius: 15px;
+                    font-size: 24px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+                    font-weight: bold;
+                  "
+                  onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(76, 175, 80, 0.5)'"
+                  onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 4px 15px rgba(76, 175, 80, 0.4)'"
+                >
+                  ✓
+                </button>
+                
+                <!-- Indicador de votos con nuestro estilo -->
+                <div id="vote-indicator-${player.name}-${category}" style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 5px;
+                  min-width: 70px;
+                  align-items: center;
+                  font-size: 14px;
+                  color: #666;
+                ">
+                  <div style="font-weight: 600;">Votos</div>
+                  <div id="vote-count-${player.name}-${category}">0/0</div>
+                </div>
+                
+                <!-- Botón INVÁLIDA -->
+                <button 
+                  id="vote-invalid-${player.name}-${category}"
+                  onclick="castVoteForWord('${player.name}', '${category}', false)"
+                  style="
+                    background: linear-gradient(135deg, #f44336, #d32f2f);
+                    color: white;
+                    border: none;
+                    width: 55px;
+                    height: 55px;
+                    border-radius: 15px;
+                    font-size: 24px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    box-shadow: 0 4px 15px rgba(244, 67, 54, 0.4);
+                    font-weight: bold;
+                  "
+                  onmouseover="this.style.transform='translateY(-3px) scale(1.05)'; this.style.boxShadow='0 6px 20px rgba(244, 67, 54, 0.5)'"
+                  onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.boxShadow='0 4px 15px rgba(244, 67, 54, 0.4)'"
+                >
+                  ✗
+                </button>
               </div>
             `;
             
-            grid.appendChild(playerCard);
+            playersGrid.appendChild(playerVoteCard);
           });
           
-          // Agregar estilos de animación
-          const style = document.createElement('style');
-          style.textContent = `
-            @keyframes fadeIn {
-              from { opacity: 0; transform: translateY(20px); }
-              to { opacity: 1; transform: translateY(0); }
-            }
-          `;
-          document.head.appendChild(style);
-        }
+          categorySection.appendChild(playersGrid);
+          votingContainer.appendChild(categorySection);
+        });
+        
+        // Inicializar estado de votación
+        initializeVotingState(data);
         
       } catch (error) {
         console.error('❌ [GAME.HTML] Error procesando datos de revisión:', error);
@@ -964,6 +1163,220 @@
         
       } catch (error) {
         console.error('❌ [GAME.HTML] Error manejando fin de revisión:', error);
+      }
+    }
+    
+    // SISTEMA DE VOTACIÓN - Estado y funciones
+    let votingState = {
+      votes: {}, // { "playerName-category": { valid: 0, invalid: 0, userVote: null } }
+      totalPlayers: 0,
+      currentUser: null
+    };
+    
+    // Inicializar estado de votación
+    function initializeVotingState(data) {
+      try {
+        console.log('🔧 [GAME.HTML] Inicializando estado de votación...');
+        
+        votingState.totalPlayers = data.players?.length || 0;
+        votingState.currentUser = gameState.playerName;
+        votingState.votes = {};
+        
+        // Inicializar votos para cada palabra
+        data.players?.forEach(player => {
+          player.words?.forEach(word => {
+            const key = `${player.name}-${word.category}`;
+            votingState.votes[key] = {
+              valid: 0,
+              invalid: 0,
+              userVote: null,
+              word: word.word,
+              player: player.name,
+              category: word.category
+            };
+          });
+        });
+        
+        console.log('✅ [GAME.HTML] Estado de votación inicializado:', votingState);
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error inicializando votación:', error);
+      }
+    }
+    
+    // Función global para votar (llamada desde onclick)
+    window.castVoteForWord = function(playerName, category, isValid) {
+      try {
+        console.log(`🗳️ [GAME.HTML] Votando: ${playerName}-${category} = ${isValid ? 'VÁLIDA' : 'INVÁLIDA'}`);
+        
+        const key = `${playerName}-${category}`;
+        const voteData = votingState.votes[key];
+        
+        if (!voteData) {
+          console.error('❌ [GAME.HTML] No se encontró la palabra para votar');
+          return;
+        }
+        
+        // Remover voto anterior si existe
+        if (voteData.userVote !== null) {
+          if (voteData.userVote) {
+            voteData.valid = Math.max(0, voteData.valid - 1);
+          } else {
+            voteData.invalid = Math.max(0, voteData.invalid - 1);
+          }
+        }
+        
+        // Agregar nuevo voto
+        voteData.userVote = isValid;
+        if (isValid) {
+          voteData.valid++;
+        } else {
+          voteData.invalid++;
+        }
+        
+        // Actualizar UI
+        updateVoteUI(playerName, category);
+        
+        // Enviar voto al servidor
+        socketManager.emit('castVote', {
+          roomId: gameState.roomId,
+          playerName: playerName,
+          category: category,
+          isValid: isValid,
+          voter: votingState.currentUser
+        });
+        
+        // Verificar si todos han votado
+        checkVotingProgress();
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error al votar:', error);
+      }
+    };
+    
+    // Actualizar UI de votación
+    function updateVoteUI(playerName, category) {
+      try {
+        const key = `${playerName}-${category}`;
+        const voteData = votingState.votes[key];
+        
+        if (!voteData) return;
+        
+        // Actualizar botones
+        const validBtn = document.getElementById(`vote-valid-${playerName}-${category}`);
+        const invalidBtn = document.getElementById(`vote-invalid-${playerName}-${category}`);
+        const indicator = document.getElementById(`vote-count-${playerName}-${category}`);
+        
+        if (validBtn && invalidBtn) {
+          // Resetear estilos
+          validBtn.style.opacity = voteData.userVote === true ? '1' : '0.7';
+          invalidBtn.style.opacity = voteData.userVote === false ? '1' : '0.7';
+          
+          // Agregar indicador visual de voto del usuario
+          if (voteData.userVote === true) {
+            validBtn.style.boxShadow = '0 0 20px rgba(76, 175, 80, 0.8)';
+            validBtn.style.border = '3px solid #ffffff';
+          } else {
+            validBtn.style.boxShadow = '0 4px 15px rgba(76, 175, 80, 0.4)';
+            validBtn.style.border = 'none';
+          }
+          
+          if (voteData.userVote === false) {
+            invalidBtn.style.boxShadow = '0 0 20px rgba(244, 67, 54, 0.8)';
+            invalidBtn.style.border = '3px solid #ffffff';
+          } else {
+            invalidBtn.style.boxShadow = '0 4px 15px rgba(244, 67, 54, 0.4)';
+            invalidBtn.style.border = 'none';
+          }
+        }
+        
+        // Actualizar contador
+        if (indicator) {
+          const totalVotes = voteData.valid + voteData.invalid;
+          indicator.innerHTML = `
+            <div style="font-weight: 600; color: ${voteData.valid > voteData.invalid ? '#4CAF50' : voteData.invalid > voteData.valid ? '#f44336' : '#666'};">
+              ${totalVotes}/${votingState.totalPlayers}
+            </div>
+            <div style="font-size: 12px;">
+              ✓${voteData.valid} ✗${voteData.invalid}
+            </div>
+          `;
+        }
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error actualizando UI de voto:', error);
+      }
+    }
+    
+    // Verificar progreso de votación
+    function checkVotingProgress() {
+      try {
+        const totalWords = Object.keys(votingState.votes).length;
+        const votedWords = Object.values(votingState.votes).filter(v => v.userVote !== null).length;
+        
+        console.log(`📊 [GAME.HTML] Progreso de votación: ${votedWords}/${totalWords} palabras votadas`);
+        
+        // Actualizar botón de confirmación
+        const confirmBtn = document.getElementById('confirm-votes-btn');
+        if (confirmBtn) {
+          if (votedWords === totalWords) {
+            confirmBtn.style.background = 'linear-gradient(135deg, #4CAF50, #45a049)';
+            confirmBtn.innerHTML = '✅ Confirmar Votación Completa';
+            confirmBtn.disabled = false;
+          } else {
+            confirmBtn.style.background = 'linear-gradient(135deg, #FF9800, #F57C00)';
+            confirmBtn.innerHTML = `⏳ Votar Restantes (${votedWords}/${totalWords})`;
+            confirmBtn.disabled = false; // Permitir confirmación parcial
+          }
+        }
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error verificando progreso:', error);
+      }
+    }
+    
+    // Confirmar resultados de votación
+    function confirmVotingResults() {
+      try {
+        console.log('✅ [GAME.HTML] Confirmando resultados de votación...');
+        
+        // Recopilar todos los votos
+        const votingResults = {};
+        Object.values(votingState.votes).forEach(vote => {
+          const key = `${vote.player}-${vote.category}`;
+          votingResults[key] = {
+            player: vote.player,
+            category: vote.category,
+            word: vote.word,
+            validVotes: vote.valid,
+            invalidVotes: vote.invalid,
+            isValid: vote.valid > vote.invalid, // Decisión por mayoría
+            userVoted: vote.userVote !== null
+          };
+        });
+        
+        console.log('📊 [GAME.HTML] Resultados compilados:', votingResults);
+        
+        // Enviar resultados al servidor
+        socketManager.emit('finishReview', {
+          roomId: gameState.roomId,
+          votingResults: votingResults,
+          voter: votingState.currentUser
+        });
+        
+        // Mostrar feedback visual
+        const confirmBtn = document.getElementById('confirm-votes-btn');
+        if (confirmBtn) {
+          confirmBtn.innerHTML = '⏳ Enviando resultados...';
+          confirmBtn.disabled = true;
+          confirmBtn.style.background = 'linear-gradient(135deg, #9E9E9E, #757575)';
+        }
+        
+        showNotification('Votación enviada. Esperando a otros jugadores...', 'info');
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error confirmando votación:', error);
+        showNotification('Error al enviar votación', 'error');
       }
     }
 
