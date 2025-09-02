@@ -177,7 +177,7 @@ class Player {
 
 // Exportar para Node.js y ES Modules
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { Player };
+module.exports = { Player };
 } else if (typeof window !== 'undefined') {
     window.Player = Player;
 }

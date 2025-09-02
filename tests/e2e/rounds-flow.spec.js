@@ -18,7 +18,7 @@ test.describe('E2E: flujo de rondas (maxRounds=1) y equidad de inputs', () => {
       
       await host.waitForURL('**/create-room.html');
       await host.fill('#roomName', 'Sala 1 Ronda');
-      await host.fill('#rounds', '1');
+    await host.fill('#rounds', '1');
       await host.click('#createRoomBtn');
       
       // Obtener código de sala
@@ -39,8 +39,8 @@ test.describe('E2E: flujo de rondas (maxRounds=1) y equidad de inputs', () => {
       await guest.waitForSelector('.waiting-room', { state: 'visible' });
       
       // HOST: iniciar juego (ahora genera letra automáticamente)
-      await host.click('#goToGameButton');
-      
+    await host.click('#goToGameButton');
+
       // Ambos deberían ir al juego
       await host.waitForURL('**/game.html*');
       await guest.waitForURL('**/game.html*');
@@ -62,9 +62,9 @@ test.describe('E2E: flujo de rondas (maxRounds=1) y equidad de inputs', () => {
       await guest.fill('#input-FRUTA', 'Banana');
       
       // Ambos envían palabras
-      await host.click('#submitWordButton');
-      await guest.click('#submitWordButton');
-      
+    await host.click('#submitWordButton');
+    await guest.click('#submitWordButton');
+
       // Deberían ser redirigidos a revisión
       await host.waitForURL('**/review.html*', { timeout: 10000 });
       await guest.waitForURL('**/review.html*', { timeout: 10000 });

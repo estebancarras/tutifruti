@@ -1,111 +1,122 @@
-2025-09-01T20:00:32.102640951Z {"ts":"2025-09-01T20:00:32.102Z","level":"info","event":"createRoom","roomId":"ek2ttztrq","socketId":"xwHrBfXMecI0yVtiAAAL","message":"Sala creada","roomName":"saaaaa32"}
-2025-09-01T20:00:39.535609179Z {"ts":"2025-09-01T20:00:39.535Z","level":"info","event":"joinRoom","roomId":"ek2ttztrq","socketId":"bl3Ct9o5oVzqlyypAAAJ","message":"Intento de unirse por aasdasddsad"}
-2025-09-01T20:00:39.536141101Z {"ts":"2025-09-01T20:00:39.536Z","level":"info","event":"joinRoom","roomId":"ek2ttztrq","socketId":"bl3Ct9o5oVzqlyypAAAJ","message":"aasdasddsad unido"}
-2025-09-01T20:00:39.841458742Z /opt/render/project/src/node_modules/mongodb/lib/sdam/topology.js:326
-2025-09-01T20:00:39.841486762Z                 const timeoutError = new error_1.MongoServerSelectionError(`Server selection timed out after ${timeout?.duration} ms`, this.description);
-2025-09-01T20:00:39.841495642Z                                      ^
-2025-09-01T20:00:39.841499512Z 
-2025-09-01T20:00:39.841504323Z MongoServerSelectionError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
-2025-09-01T20:00:39.841510583Z     at Topology.selectServer (/opt/render/project/src/node_modules/mongodb/lib/sdam/topology.js:326:38)
-2025-09-01T20:00:39.841514893Z     at async Topology._connect (/opt/render/project/src/node_modules/mongodb/lib/sdam/topology.js:200:28)
-2025-09-01T20:00:39.841519303Z     at async Topology.connect (/opt/render/project/src/node_modules/mongodb/lib/sdam/topology.js:152:13)
-2025-09-01T20:00:39.841523383Z     at async topologyConnect (/opt/render/project/src/node_modules/mongodb/lib/mongo_client.js:258:17)
-2025-09-01T20:00:39.841527703Z     at async MongoClient._connect (/opt/render/project/src/node_modules/mongodb/lib/mongo_client.js:271:13)
-2025-09-01T20:00:39.841531613Z     at async MongoClient.connect (/opt/render/project/src/node_modules/mongodb/lib/mongo_client.js:196:13)
-2025-09-01T20:00:39.841535913Z     at async MongoClient.connect (/opt/render/project/src/node_modules/mongodb/lib/mongo_client.js:418:16) {
-2025-09-01T20:00:39.841541923Z   errorLabelSet: Set(0) {},
-2025-09-01T20:00:39.841546304Z   reason: TopologyDescription {
-2025-09-01T20:00:39.841551453Z     type: 'Unknown',
-2025-09-01T20:00:39.841555734Z     servers: Map(1) {
-2025-09-01T20:00:39.841595354Z       'localhost:27017' => ServerDescription {
-2025-09-01T20:00:39.841599645Z         address: 'localhost:27017',
-2025-09-01T20:00:39.841602345Z         type: 'Unknown',
-2025-09-01T20:00:39.841604915Z         hosts: [],
-2025-09-01T20:00:39.841607225Z         passives: [],
-2025-09-01T20:00:39.841609395Z         arbiters: [],
-2025-09-01T20:00:39.841611905Z         tags: {},
-2025-09-01T20:00:39.841614915Z         minWireVersion: 0,
-2025-09-01T20:00:39.841617495Z         maxWireVersion: 0,
-2025-09-01T20:00:39.841620185Z         roundTripTime: -1,
-2025-09-01T20:00:39.841622795Z         minRoundTripTime: 0,
-2025-09-01T20:00:39.841625325Z         lastUpdateTime: 3420470421,
-2025-09-01T20:00:39.841628155Z         lastWriteDate: 0,
-2025-09-01T20:00:39.841630765Z         error: MongoNetworkError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
-2025-09-01T20:00:39.841633366Z             at Socket.<anonymous> (/opt/render/project/src/node_modules/mongodb/lib/cmap/connect.js:286:44)
-2025-09-01T20:00:39.841638355Z             at Object.onceWrapper (node:events:633:26)
-2025-09-01T20:00:39.841640716Z             at Socket.emit (node:events:518:28)
-2025-09-01T20:00:39.841643336Z             at emitErrorNT (node:internal/streams/destroy:170:8)
-2025-09-01T20:00:39.841646536Z             at emitErrorCloseNT (node:internal/streams/destroy:129:3)
-2025-09-01T20:00:39.841649486Z             at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
-2025-09-01T20:00:39.841651996Z           errorLabelSet: Set(1) { 'ResetPool' },
-2025-09-01T20:00:39.841654976Z           beforeHandshake: false,
-2025-09-01T20:00:39.841657696Z           [cause]: AggregateError [ECONNREFUSED]: 
-2025-09-01T20:00:39.841660616Z               at internalConnectMultiple (node:net:1139:18)
-2025-09-01T20:00:39.841663216Z               at afterConnectMultiple (node:net:1714:7) {
-2025-09-01T20:00:39.841665736Z             code: 'ECONNREFUSED',
-2025-09-01T20:00:39.841668216Z             [errors]: [Array]
-2025-09-01T20:00:39.841670856Z           }
-2025-09-01T20:00:39.841673256Z         },
-2025-09-01T20:00:39.841676216Z         topologyVersion: null,
-2025-09-01T20:00:39.841678796Z         setName: null,
-2025-09-01T20:00:39.841681387Z         setVersion: null,
-2025-09-01T20:00:39.841683967Z         electionId: null,
-2025-09-01T20:00:39.841686337Z         logicalSessionTimeoutMinutes: null,
-2025-09-01T20:00:39.841688367Z         maxMessageSizeBytes: null,
-2025-09-01T20:00:39.841690517Z         maxWriteBatchSize: null,
-2025-09-01T20:00:39.841692907Z         maxBsonObjectSize: null,
-2025-09-01T20:00:39.841695437Z         primary: null,
-2025-09-01T20:00:39.841698167Z         me: null,
-2025-09-01T20:00:39.841700557Z         '$clusterTime': null,
-2025-09-01T20:00:39.841703217Z         iscryptd: false
-2025-09-01T20:00:39.841705867Z       }
-2025-09-01T20:00:39.841708367Z     },
-2025-09-01T20:00:39.841710917Z     stale: false,
-2025-09-01T20:00:39.841713287Z     compatible: true,
-2025-09-01T20:00:39.841715567Z     heartbeatFrequencyMS: 10000,
-2025-09-01T20:00:39.841718037Z     localThresholdMS: 15,
-2025-09-01T20:00:39.841720937Z     setName: null,
-2025-09-01T20:00:39.841723437Z     maxElectionId: null,
-2025-09-01T20:00:39.841726137Z     maxSetVersion: null,
-2025-09-01T20:00:39.841728598Z     commonWireVersion: 0,
-2025-09-01T20:00:39.841731418Z     logicalSessionTimeoutMinutes: null
-2025-09-01T20:00:39.841733768Z   },
-2025-09-01T20:00:39.841736608Z   code: undefined,
-2025-09-01T20:00:39.841739258Z   [cause]: MongoNetworkError: connect ECONNREFUSED ::1:27017, connect ECONNREFUSED 127.0.0.1:27017
-2025-09-01T20:00:39.841747708Z       at Socket.<anonymous> (/opt/render/project/src/node_modules/mongodb/lib/cmap/connect.js:286:44)
-2025-09-01T20:00:39.841750348Z       at Object.onceWrapper (node:events:633:26)
-2025-09-01T20:00:39.841752748Z       at Socket.emit (node:events:518:28)
-2025-09-01T20:00:39.841755798Z       at emitErrorNT (node:internal/streams/destroy:170:8)
-2025-09-01T20:00:39.841758298Z       at emitErrorCloseNT (node:internal/streams/destroy:129:3)
-2025-09-01T20:00:39.841761148Z       at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
-2025-09-01T20:00:39.841763758Z     errorLabelSet: Set(1) { 'ResetPool' },
-2025-09-01T20:00:39.841766478Z     beforeHandshake: false,
-2025-09-01T20:00:39.841769069Z     [cause]: AggregateError [ECONNREFUSED]: 
-2025-09-01T20:00:39.841771709Z         at internalConnectMultiple (node:net:1139:18)
-2025-09-01T20:00:39.841774039Z         at afterConnectMultiple (node:net:1714:7) {
-2025-09-01T20:00:39.841776619Z       code: 'ECONNREFUSED',
-2025-09-01T20:00:39.841779139Z       [errors]: [
-2025-09-01T20:00:39.841781709Z         Error: connect ECONNREFUSED ::1:27017
-2025-09-01T20:00:39.841784199Z             at createConnectionError (node:net:1677:14)
-2025-09-01T20:00:39.841786479Z             at afterConnectMultiple (node:net:1707:16) {
-2025-09-01T20:00:39.841788629Z           errno: -111,
-2025-09-01T20:00:39.841791089Z           code: 'ECONNREFUSED',
-2025-09-01T20:00:39.841793579Z           syscall: 'connect',
-2025-09-01T20:00:39.841813959Z           address: '::1',
-2025-09-01T20:00:39.84181756Z           port: 27017
-2025-09-01T20:00:39.84182065Z         },
-2025-09-01T20:00:39.8418233Z         Error: connect ECONNREFUSED 127.0.0.1:27017
-2025-09-01T20:00:39.84182636Z             at createConnectionError (node:net:1677:14)
-2025-09-01T20:00:39.84182907Z             at afterConnectMultiple (node:net:1707:16) {
-2025-09-01T20:00:39.84183162Z           errno: -111,
-2025-09-01T20:00:39.84183437Z           code: 'ECONNREFUSED',
-2025-09-01T20:00:39.84183686Z           syscall: 'connect',
-2025-09-01T20:00:39.84183945Z           address: '127.0.0.1',
-2025-09-01T20:00:39.84184221Z           port: 27017
-2025-09-01T20:00:39.84184445Z         }
-2025-09-01T20:00:39.84184697Z       ]
-2025-09-01T20:00:39.84184983Z     }
-2025-09-01T20:00:39.84185288Z   }
-2025-09-01T20:00:39.841855391Z }
-2025-09-01T20:00:39.841857911Z 
-2025-09-01T20:00:39.841860421Z Node.js v22.16.0
+ℹ️ [joinRoom] Intento de unirse por sd
+{"ts":"2025-09-02T01:55:20.200Z","level":"info","event":"joinRoom","roomId":"eng6ibeg2","socketId":"6Rr2TGznwl4lIUOaAAAD","message":"Intento de unirse por sd","memoryUsage":{"rss":79380480,"heapTotal":21942272,"heapUsed":20157224,"external":20570370,"arrayBuffers":18269717}}
+ℹ️ [joinRoom] sd unido
+{"ts":"2025-09-02T01:55:20.201Z","level":"info","event":"joinRoom","roomId":"eng6ibeg2","socketId":"6Rr2TGznwl4lIUOaAAAD","message":"sd unido","memoryUsage":{"rss":79380480,"heapTotal":21942272,"heapUsed":20182760,"external":20570370,"arrayBuffers":18269717}}
+ℹ️ [startGame] Juego iniciado con letra L
+{"ts":"2025-09-02T01:55:23.285Z","level":"info","event":"startGame","roomId":"eng6ibeg2","socketId":"dCxQY_PmzX-mVrmfAAAB","message":"Juego iniciado con letra L","memoryUsage":{"rss":79380480,"heapTotal":21942272,"heapUsed":20255512,"external":20570396,"arrayBuffers":18269743}}
+ℹ️ [disconnect] Cliente desconectado (período de gracia iniciado)
+{"ts":"2025-09-02T01:55:24.294Z","level":"info","event":"disconnect","roomId":"eng6ibeg2","socketId":"dCxQY_PmzX-mVrmfAAAB","message":"Cliente desconectado (período de gracia iniciado)","memoryUsage":{"rss":79380480,"heapTotal":21942272,"heapUsed":20427296,"external":20605048,"arrayBuffers":18304395}}
+🔌 [SOCKET] Nuevo cliente conectado: 13xLNjuNOG5waP6SAAAF
+🔌 [SOCKET] Headers: {
+  host: 'tutifruti-3ii6.onrender.com',
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  accept: '*/*',
+  'accept-encoding': 'gzip, br',
+  'accept-language': 'es-ES,es;q=0.9',
+  'cdn-loop': 'cloudflare; loops=1',
+  'cf-connecting-ip': '191.118.44.116',
+  'cf-ipcountry': 'CL',
+  'cf-ray': '978962947c37e9a5-SCL',
+  'cf-visitor': '{"scheme":"https"}',
+  cookie: 'tutifruti.sid=s%3Afz5RGSXey1DEluf198yxdMb1QkjQ5sdD.8GxD5ccIb0iKNfAn2bI8VLPdIG3HI6jgVcCwZv8iZJs',
+  dnt: '1',
+  priority: 'u=1, i',
+  referer: 'https://tutifruti-3ii6.onrender.com/views/game.html?roomId=eng6ibeg2',
+  'render-proxy-ttl': '4',
+  'rndr-id': '34bacbb7-2ed3-41d3',
+  'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+  'sec-fetch-dest': 'empty',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-site': 'same-origin',
+  'true-client-ip': '191.118.44.116',
+  'x-forwarded-for': '191.118.44.116, 104.23.202.108, 10.229.132.68',
+  'x-forwarded-proto': 'https',
+  'x-request-start': '1756778125627392'
+}
+🔌 [SOCKET] Transport: polling
+🔌 [CONNECTION] Nuevo cliente conectado: 13xLNjuNOG5waP6SAAAF
+🔌 [CONNECTION] Transport usado: polling
+🔌 [CONNECTION] Headers de conexión: [
+  'host',               'user-agent',
+  'accept',             'accept-encoding',
+  'accept-language',    'cdn-loop',
+  'cf-connecting-ip',   'cf-ipcountry',
+  'cf-ray',             'cf-visitor',
+  'cookie',             'dnt',
+  'priority',           'referer',
+  'render-proxy-ttl',   'rndr-id',
+  'sec-ch-ua',          'sec-ch-ua-mobile',
+  'sec-ch-ua-platform', 'sec-fetch-dest',
+  'sec-fetch-mode',     'sec-fetch-site',
+  'true-client-ip',     'x-forwarded-for',
+  'x-forwarded-proto',  'x-request-start'
+]
+ℹ️ [reconnectPlayer] Re-conectado y estado enviado
+{"ts":"2025-09-02T01:55:26.505Z","level":"info","event":"reconnectPlayer","roomId":"eng6ibeg2","socketId":"13xLNjuNOG5waP6SAAAF","message":"Re-conectado y estado enviado","memoryUsage":{"rss":79642624,"heapTotal":22728704,"heapUsed":20850472,"external":20614077,"arrayBuffers":18313424}}
+ℹ️ [getRoomState] Estado de sala enviado
+{"ts":"2025-09-02T01:55:26.835Z","level":"info","event":"getRoomState","roomId":"eng6ibeg2","socketId":"13xLNjuNOG5waP6SAAAF","message":"Estado de sala enviado","memoryUsage":{"rss":79773696,"heapTotal":22728704,"heapUsed":20531632,"external":20604938,"arrayBuffers":18304285}}
+ℹ️ [disconnect] Cliente desconectado (período de gracia iniciado)
+{"ts":"2025-09-02T01:55:28.780Z","level":"info","event":"disconnect","roomId":"eng6ibeg2","socketId":"6Rr2TGznwl4lIUOaAAAD","message":"Cliente desconectado (período de gracia iniciado)","memoryUsage":{"rss":79773696,"heapTotal":22728704,"heapUsed":20862040,"external":20623705,"arrayBuffers":18323052}}
+🔌 [SOCKET] Nuevo cliente conectado: mcDG2d7q79SOSVgHAAAH
+🔌 [SOCKET] Headers: {
+  host: 'tutifruti-3ii6.onrender.com',
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  accept: '*/*',
+  'accept-encoding': 'gzip, br',
+  'accept-language': 'es-ES,es;q=0.9',
+  'cdn-loop': 'cloudflare; loops=1',
+  'cf-connecting-ip': '191.118.44.116',
+  'cf-ipcountry': 'CL',
+  'cf-ray': '978962b78ed5e9a8-SCL',
+  'cf-visitor': '{"scheme":"https"}',
+  cookie: 'tutifruti.sid=s%3Al5ZAAn_8aKMSK0DGltcUHBfqfCavamuz.KiGmekiBwXmBQSdkCPyQY%2B6wYzHx878sK57C8d85njg',
+  priority: 'u=1, i',
+  referer: 'https://tutifruti-3ii6.onrender.com/views/game.html?roomId=eng6ibeg2',
+  'render-proxy-ttl': '4',
+  'rndr-id': '67a47186-d117-4317',
+  'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+  'sec-ch-ua-mobile': '?0',
+  'sec-ch-ua-platform': '"Windows"',
+  'sec-fetch-dest': 'empty',
+  'sec-fetch-mode': 'cors',
+  'sec-fetch-site': 'same-origin',
+  'true-client-ip': '191.118.44.116',
+  'x-forwarded-for': '191.118.44.116, 104.23.202.230, 10.229.216.68',
+  'x-forwarded-proto': 'https',
+  'x-request-start': '1756778131230787'
+}
+🔌 [SOCKET] Transport: polling
+🔌 [CONNECTION] Nuevo cliente conectado: mcDG2d7q79SOSVgHAAAH
+🔌 [CONNECTION] Transport usado: polling
+🔌 [CONNECTION] Headers de conexión: [
+  'host',             'user-agent',
+  'accept',           'accept-encoding',
+  'accept-language',  'cdn-loop',
+  'cf-connecting-ip', 'cf-ipcountry',
+  'cf-ray',           'cf-visitor',
+  'cookie',           'priority',
+  'referer',          'render-proxy-ttl',
+  'rndr-id',          'sec-ch-ua',
+  'sec-ch-ua-mobile', 'sec-ch-ua-platform',
+  'sec-fetch-dest',   'sec-fetch-mode',
+  'sec-fetch-site',   'true-client-ip',
+  'x-forwarded-for',  'x-forwarded-proto',
+  'x-request-start'
+]
+ℹ️ [reconnectPlayer] Re-conectado y estado enviado
+{"ts":"2025-09-02T01:55:33.193Z","level":"info","event":"reconnectPlayer","roomId":"eng6ibeg2","socketId":"mcDG2d7q79SOSVgHAAAH","message":"Re-conectado y estado enviado","memoryUsage":{"rss":80285696,"heapTotal":22728704,"heapUsed":21117608,"external":20588776,"arrayBuffers":18288123}}
+ℹ️ [getRoomState] Estado de sala enviado
+{"ts":"2025-09-02T01:55:33.638Z","level":"info","event":"getRoomState","roomId":"eng6ibeg2","socketId":"mcDG2d7q79SOSVgHAAAH","message":"Estado de sala enviado","memoryUsage":{"rss":80285696,"heapTotal":22728704,"heapUsed":21181168,"external":20588824,"arrayBuffers":18288171}}
+ℹ️ [submitWords] sd envió sus palabras
+{"ts":"2025-09-02T01:55:39.191Z","level":"info","event":"submitWords","roomId":"eng6ibeg2","socketId":"mcDG2d7q79SOSVgHAAAH","message":"sd envió sus palabras","memoryUsage":{"rss":80547840,"heapTotal":22990848,"heapUsed":20816352,"external":20569480,"arrayBuffers":18268827}}
+🔍 [DEBUG] Sala eng6ibeg2 en revisión: { players: 2, connected: 2, isPlaying: true, roundPhase: 'review' }
+ℹ️ [startReview] Iniciada revisión para ronda 1
+{"ts":"2025-09-02T01:55:41.269Z","level":"info","event":"startReview","roomId":"eng6ibeg2","message":"Iniciada revisión para ronda 1","memoryUsage":{"rss":80547840,"heapTotal":22990848,"heapUsed":20885664,"external":20569724,"arrayBuffers":18269071}}
+ℹ️ [submitWords] dsf envió sus palabras
+{"ts":"2025-09-02T01:55:41.269Z","level":"info","event":"submitWords","roomId":"eng6ibeg2","socketId":"13xLNjuNOG5waP6SAAAF","message":"dsf envió sus palabras","memoryUsage":{"rss":80547840,"heapTotal":22990848,"heapUsed":20888584,"external":20569724,"arrayBuffers":18269071}}
+ℹ️ [disconnect] Cliente desconectado (período de gracia iniciado)
+{"ts":"2025-09-02T01:55:45.255Z","level":"info","event":"disconnect","roomId":"eng6ibeg2","socketId":"13xLNjuNOG5waP6SAAAF","message":"Cliente desconectado (período de gracia iniciado)","memoryUsage":{"rss":80547840,"heapTotal":22990848,"heapUsed":20913560,"external":20569745,"arrayBuffers":18269092}}
+ℹ️ [disconnect] Cliente desconectado (período de gracia iniciado)
+{"ts":"2025-09-02T01:55:46.298Z","level":"info","event":"disconnect","roomId":"eng6ibeg2","socketId":"mcDG2d7q79SOSVgHAAAH","message":"Cliente desconectado (período de gracia iniciado)","memoryUsage":{"rss":80678912,"heapTotal":22990848,"heapUsed":21346984,"external":20569739,"arrayBuffers":18269086}}

@@ -595,13 +595,9 @@
         // Mostrar notificación de transición
         showNotification(data.message || '¡Hora de revisar las palabras!', 'info');
         
-        // SOLUCIÓN DEFINITIVA: Cargar revisión en la misma página
+        // SOLUCIÓN DEFINITIVA: Implementar revisión 100% NATIVA
         try {
-          console.log('🔄 [GAME.HTML] Cargando revisión en la misma página...');
-          
-          // Guardar estado crítico
-          localStorage.setItem('reviewTransition', 'true');
-          localStorage.setItem('reviewData', JSON.stringify(data));
+          console.log('🔄 [GAME.HTML] Implementando revisión NATIVA - SIN redirección...');
           
           // Ocultar interfaz de juego
           const gameContainer = document.querySelector('.game-container');
@@ -609,13 +605,12 @@
             gameContainer.style.display = 'none';
           }
           
-          // Cargar revisión dinámicamente
-          loadReviewInterface(data);
+          // Implementar interfaz de revisión directamente
+          implementNativeReviewInterface(data);
           
         } catch (error) {
-          console.error('❌ [GAME.HTML] Error cargando revisión:', error);
-          // Fallback: mostrar mensaje de error
-          showNotification('Error al cargar revisión', 'error');
+          console.error('❌ [GAME.HTML] Error implementando revisión nativa:', error);
+          showNotification('Error al implementar revisión', 'error');
         }
         
       } catch (e) {
@@ -700,14 +695,14 @@
       }
     }
     
-    // SOLUCIÓN DEFINITIVA: Cargar interfaz de revisión en la misma página
-    function loadReviewInterface(data) {
+    // SOLUCIÓN DEFINITIVA: Implementar revisión 100% NATIVA
+    function implementNativeReviewInterface(data) {
       try {
-        console.log('🔄 [GAME.HTML] Implementando interfaz de revisión...');
+        console.log('🔄 [GAME.HTML] Creando interfaz de revisión NATIVA...');
         
-        // Crear contenedor de revisión
+        // Crear contenedor de revisión COMPLETO
         const reviewContainer = document.createElement('div');
-        reviewContainer.id = 'review-container';
+        reviewContainer.id = 'native-review-container';
         reviewContainer.innerHTML = `
           <div style="
             position: fixed;
@@ -716,39 +711,213 @@
             width: 100%;
             height: 100vh;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
             z-index: 9999;
-            color: white;
-            font-size: 24px;
-            text-align: center;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
           ">
-            <div>
-              <div style="font-size: 48px; margin-bottom: 20px;">🔍</div>
-              <div>Revisión de palabras</div>
-              <div style="font-size: 16px; margin-top: 10px;">Ronda ${data.round} - Letra ${data.letter}</div>
-              <div style="font-size: 14px; margin-top: 20px; opacity: 0.8;">
-                Manteniendo conexión activa...<br>
-                Redirigiendo a página de revisión en 3 segundos
-              </div>
+            <!-- Header de revisión -->
+            <div style="
+              text-align: center;
+              color: white;
+              margin-bottom: 30px;
+            ">
+              <h2 style="font-size: 32px; margin: 0;">🔍 Revisión de Palabras</h2>
+              <p style="font-size: 18px; opacity: 0.9;">Ronda ${data.round} - Letra ${data.letter}</p>
+              <div id="review-status" style="font-size: 16px; opacity: 0.8;">Esperando datos de revisión...</div>
+            </div>
+            
+            <!-- Lista de jugadores y palabras -->
+            <div id="players-review-grid" style="
+              display: grid;
+              gap: 20px;
+              max-width: 1200px;
+              margin: 0 auto;
+              grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            ">
+              <!-- Se llenará dinámicamente -->
+            </div>
+            
+            <!-- Controles de revisión -->
+            <div style="
+              position: fixed;
+              bottom: 20px;
+              left: 50%;
+              transform: translateX(-50%);
+              background: rgba(255, 255, 255, 0.9);
+              padding: 15px;
+              border-radius: 10px;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            ">
+              <button id="continue-review-btn" style="
+                background: #4CAF50;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 6px;
+                font-size: 16px;
+                cursor: pointer;
+                margin-right: 10px;
+              ">Continuar Revisión</button>
+              
+              <button id="skip-review-btn" style="
+                background: #FF9800;
+                color: white;
+                border: none;
+                padding: 12px 24px;
+                border-radius: 6px;
+                font-size: 16px;
+                cursor: pointer;
+              ">Saltar Revisión</button>
             </div>
           </div>
         `;
+        
         document.body.appendChild(reviewContainer);
         
-        // Redirigir después de 3 segundos para dar tiempo a que se establezca la conexión
-        setTimeout(() => {
-          console.log('🔄 [GAME.HTML] Redirigiendo a review.html...');
-          const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
-          window.location.href = reviewUrl;
-        }, 3000);
+        // Configurar handlers de la revisión nativa
+        setupNativeReviewHandlers(data);
+        
+        // Solicitar datos de revisión al servidor
+        socketManager.emit('getRoomState', { roomId: gameState.roomId });
+        
+        console.log('✅ [GAME.HTML] Interfaz de revisión NATIVA implementada');
         
       } catch (error) {
-        console.error('❌ [GAME.HTML] Error en loadReviewInterface:', error);
-        // Fallback: redirección directa
-        const reviewUrl = data.reviewUrl || `/views/review.html?roomId=${gameState.roomId}`;
-        window.location.href = reviewUrl;
+        console.error('❌ [GAME.HTML] Error en implementNativeReviewInterface:', error);
+        showNotification('Error al implementar revisión nativa', 'error');
+      }
+    }
+    
+    // Configurar handlers para la revisión nativa
+    function setupNativeReviewHandlers(data) {
+      try {
+        // Handler para continuar revisión
+        const continueBtn = document.getElementById('continue-review-btn');
+        if (continueBtn) {
+          continueBtn.addEventListener('click', () => {
+            console.log('🔄 [GAME.HTML] Usuario eligió continuar revisión...');
+            showNotification('Procesando revisión...', 'info');
+            // Aquí iría la lógica de votación en el futuro
+            
+            // Por ahora, simular revisión completada
+            setTimeout(() => {
+              finishNativeReview();
+            }, 2000);
+          });
+        }
+        
+        // Handler para saltar revisión
+        const skipBtn = document.getElementById('skip-review-btn');
+        if (skipBtn) {
+          skipBtn.addEventListener('click', () => {
+            console.log('🔄 [GAME.HTML] Usuario eligió saltar revisión...');
+            showNotification('Saltando revisión...', 'info');
+            finishNativeReview();
+          });
+        }
+        
+        // Escuchar eventos de revisión del servidor
+        socketManager.on('reviewData', handleNativeReviewData);
+        socketManager.on('reviewEnded', handleNativeReviewEnded);
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error configurando handlers:', error);
+      }
+    }
+    
+    // Handler para datos de revisión
+    function handleNativeReviewData(data) {
+      try {
+        console.log('📊 [GAME.HTML] Datos de revisión recibidos:', data);
+        
+        const statusDiv = document.getElementById('review-status');
+        if (statusDiv) {
+          statusDiv.textContent = `Revisando palabras de ${data.players?.length || 0} jugadores`;
+        }
+        
+        const grid = document.getElementById('players-review-grid');
+        if (grid && data.players) {
+          grid.innerHTML = '';
+          
+          data.players.forEach(player => {
+            const playerCard = document.createElement('div');
+            playerCard.style.cssText = `
+              background: rgba(255, 255, 255, 0.95);
+              border-radius: 10px;
+              padding: 20px;
+              box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            `;
+            
+            playerCard.innerHTML = `
+              <h3 style="margin: 0 0 15px 0; color: #333;">${player.name}</h3>
+              <div style="display: grid; gap: 10px;">
+                ${(player.words || []).map(word => `
+                  <div style="
+                    background: #f5f5f5;
+                    padding: 10px;
+                    border-radius: 6px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                  ">
+                    <span>${word.category}: <strong>${word.word}</strong></span>
+                    <span style="color: ${word.isValid ? '#4CAF50' : '#F44336'};">
+                      ${word.isValid ? '✓' : '✗'}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+            
+            grid.appendChild(playerCard);
+          });
+        }
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error procesando datos de revisión:', error);
+      }
+    }
+    
+    // Finalizar revisión nativa
+    function finishNativeReview() {
+      try {
+        console.log('🔄 [GAME.HTML] Finalizando revisión nativa...');
+        
+        // Remover interfaz de revisión
+        const reviewContainer = document.getElementById('native-review-container');
+        if (reviewContainer) {
+          reviewContainer.remove();
+        }
+        
+        // Mostrar interfaz de juego nuevamente
+        const gameContainer = document.querySelector('.game-container');
+        if (gameContainer) {
+          gameContainer.style.display = 'block';
+        }
+        
+        // Notificar al servidor que terminamos la revisión
+        socketManager.emit('finishReview', { roomId: gameState.roomId });
+        
+        showNotification('Revisión completada', 'success');
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error finalizando revisión:', error);
+      }
+    }
+    
+    // Handler para cuando la revisión termina
+    function handleNativeReviewEnded(data) {
+      try {
+        console.log('✅ [GAME.HTML] Revisión terminada:', data);
+        finishNativeReview();
+        
+        if (data.nextRound) {
+          showNotification(`¡Próxima ronda! Letra: ${data.nextRound.letter}`, 'info');
+        }
+        
+      } catch (error) {
+        console.error('❌ [GAME.HTML] Error manejando fin de revisión:', error);
       }
     }
 
