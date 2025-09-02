@@ -402,3 +402,351 @@
     border-top-color: var(--color-gray-600);
   }
 }
+
+/* ========================================
+   FASE 4: ANIMACIONES Y MICRO-INTERACCIONES
+   ======================================== */
+
+/* Animaciones suaves para inputs */
+.word-input {
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.word-input:focus {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+}
+
+.word-input.filled {
+  background: linear-gradient(135deg, #e8f5e8, #f0fff0);
+  border-color: #4CAF50;
+  animation: wordComplete 0.5s ease;
+}
+
+@keyframes wordComplete {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Animaciones para botones */
+.action-button, .btn {
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-button:hover, .btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.action-button:active, .btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Efecto ripple en botones */
+.action-button::before, .btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.action-button:active::before, .btn:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Animaciones para notificaciones */
+.notification {
+  animation: slideIn 0.4s ease, slideOut 0.4s ease 2.6s forwards;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Animaciones para el timer */
+.timer-compact {
+  transition: all 0.3s ease;
+}
+
+.timer-compact.warning {
+  animation: timerPulse 1s ease-in-out infinite;
+  background: linear-gradient(135deg, #ff6b6b, #ff5252);
+}
+
+@keyframes timerPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+/* Micro-interacciones para categorías */
+.category-card {
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.category-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
+}
+
+.category-card.completed {
+  background: linear-gradient(135deg, #e8f5e8, #f0fff0);
+  border-color: #4CAF50;
+  animation: categoryComplete 0.6s ease;
+}
+
+@keyframes categoryComplete {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* Animaciones para la letra actual */
+.current-letter-display {
+  transition: all 0.4s ease;
+  animation: letterReveal 0.8s ease;
+}
+
+/* FASE 4: Estilos para letras especiales */
+.current-letter-display.rare-letter {
+  background: linear-gradient(135deg, #9C27B0, #673AB7);
+  box-shadow: 0 0 30px rgba(156, 39, 176, 0.6);
+  animation: letterReveal 0.8s ease, rarePulse 2s ease-in-out infinite 1s;
+}
+
+.current-letter-display.medium-letter {
+  background: linear-gradient(135deg, #FF9800, #FF5722);
+  box-shadow: 0 0 25px rgba(255, 152, 0, 0.5);
+  animation: letterReveal 0.8s ease, mediumGlow 1.5s ease-in-out infinite 1s;
+}
+
+@keyframes rarePulse {
+  0%, 100% { 
+    transform: scale(1);
+    box-shadow: 0 0 30px rgba(156, 39, 176, 0.6);
+  }
+  50% { 
+    transform: scale(1.05);
+    box-shadow: 0 0 40px rgba(156, 39, 176, 0.8);
+  }
+}
+
+@keyframes mediumGlow {
+  0%, 100% { 
+    box-shadow: 0 0 25px rgba(255, 152, 0, 0.5);
+  }
+  50% { 
+    box-shadow: 0 0 35px rgba(255, 152, 0, 0.7);
+  }
+}
+
+@keyframes streakIndicatorPulse {
+  0%, 100% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% { 
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes letterReveal {
+  0% {
+    transform: scale(0) rotate(180deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(90deg);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+/* Estados de carga mejorados */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(102, 126, 234, 0.1);
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Feedback visual para conexión */
+.connection-status {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  z-index: 1000;
+  transition: all 0.3s ease;
+}
+
+.connection-status.connected {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  animation: fadeIn 0.3s ease;
+}
+
+.connection-status.disconnected {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ========================================
+   MEJORAS MÓVIL FASE 4 - NAVEGACIÓN TABS
+   ======================================== */
+
+/* Sistema de tabs móvil mejorado */
+@media (max-width: 480px) {
+  .categories-mobile-container {
+    margin: var(--space-4) 0;
+  }
+  
+  .categories-mobile-tabs {
+    display: flex;
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: var(--space-1);
+    margin: 0 var(--space-3) var(--space-4);
+    box-shadow: var(--shadow);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .categories-mobile-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .tab-button {
+    background: transparent;
+    border: none;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-gray-600);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    min-width: max-content;
+    position: relative;
+  }
+  
+  .tab-button.active {
+    background: var(--color-primary);
+    color: white;
+    box-shadow: var(--shadow-sm);
+    transform: scale(1.02);
+  }
+  
+  .tab-button:active {
+    transform: scale(0.98);
+  }
+  
+  /* Contenido por tabs */
+  .category-tab-content {
+    display: none;
+    padding: 0 var(--space-3);
+  }
+  
+  .category-tab-content.active {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+    animation: fadeInUp 0.3s ease;
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Indicador de progreso móvil */
+  .mobile-progress {
+    background: white;
+    border-radius: var(--radius-lg);
+    padding: var(--space-3);
+    margin: 0 var(--space-3) var(--space-4);
+    box-shadow: var(--shadow-sm);
+    text-align: center;
+    font-size: var(--text-sm);
+    color: var(--color-gray-600);
+  }
+  
+  .progress-bar {
+    background: var(--color-gray-200);
+    border-radius: var(--radius-full);
+    height: 8px;
+    margin-top: var(--space-2);
+    overflow: hidden;
+  }
+  
+  .progress-fill {
+    background: linear-gradient(90deg, var(--color-primary), #7c3aed);
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width 0.3s ease;
+  }
+}

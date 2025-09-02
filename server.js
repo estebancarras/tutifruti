@@ -580,14 +580,17 @@ io.on('connection', (socket) => {
     gameState.currentRound = 1;
     gameState.roundPhase = 'writing';
     
-    // Generar letra aleatoria inmediatamente
-      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      gameState.currentLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+    // FASE 4: Generar letra con sistema de racha
+    const letterData = generateLetterWithHistory(gameState);
       
-    // Emit directo sin ruleta - ROUNDSTART inmediato
+    // Emit directo sin ruleta - ROUNDSTART inmediato con datos de racha
     io.to(roomId).emit('roundStart', {
-        letter: gameState.currentLetter,
+        letter: letterData.letter,
         timeLimit: gameState.timeLimit,
+        streakBonuses: letterData.streakBonuses,
+        letterHistory: letterData.letterHistory,
+        isRare: letterData.isRare,
+        isMedium: letterData.isMedium,
       round: gameState.currentRound,
       categories: gameState.categories
     });
@@ -781,36 +784,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Votación durante la fase de revisión
-  socket.on('castVote', ({ roomId, voterName, targetPlayer, category, decision }) => {
-    const gameState = gameStates[roomId];
-    if (!gameState || gameState.roundPhase !== 'review') return;
-    const voter = (voterName || socket.playerName || '').trim();
-    const target = (targetPlayer || '').trim();
-    const cat = (category || '').trim();
-    const dec = decision === 'invalid' ? 'invalid' : 'valid';
-    
-    if (!voter || !target || !cat) return;
-    if (voter.toLowerCase() === target.toLowerCase()) return; // No auto-voto
-    
-    if (!gameState.votes[target]) gameState.votes[target] = {};
-    if (!gameState.votes[target][cat]) gameState.votes[target][cat] = { valid: new Set(), invalid: new Set() };
-    
-    // Quitar de ambos y agregar al elegido
-    gameState.votes[target][cat].valid.delete(voter);
-    gameState.votes[target][cat].invalid.delete(voter);
-    gameState.votes[target][cat][dec].add(voter);
-    
-    // Broadcast liviano (sin revelar votos detallados si no se desea)
-    io.to(roomId).emit('voteUpdate', {
-      targetPlayer,
-      category,
-      validCount: gameState.votes[target][cat].valid.size,
-      invalidCount: gameState.votes[target][cat].invalid.size
-    });
-    
-    logEvent({ socket, event: 'castVote', roomId, message: `Voto ${dec} de ${voter} sobre ${target}/${cat}` });
-  });
+  // Votación durante la fase de revisión - ELIMINADO (implementación duplicada)
   
   // Avanzar a la siguiente ronda (host) tras revisión
   socket.on('nextRound', ({ roomId, resolutions = {} }) => {
@@ -975,17 +949,19 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Votar en revisión social
-  socket.on('castVote', ({ roomId, wordId, vote }) => {
+  // Votar en revisión social - COMPATIBLE CON FRONTEND
+  socket.on('castVote', ({ roomId, playerName, category, isValid, voter }) => {
     try {
+      console.log(`🗳️ [SERVER] Voto recibido:`, { roomId, playerName, category, isValid, voter });
+      
       // Rate limiting
-      if (!checkRateLimit(socket, 'castVote', 2000)) {
+      if (!checkRateLimit(socket, 'castVote', 1000)) {
         logEvent({ socket, event: 'castVote', level: 'warn', message: 'Rate limit' });
         return socket.emit('reviewError', { message: 'Demasiados votos. Espera un momento.' });
       }
 
       const gameState = gameStates[roomId];
-      if (!gameState || !gameState.reviewData) {
+      if (!gameState || gameState.roundPhase !== 'review') {
         return socket.emit('reviewError', { message: 'Revisión no disponible' });
       }
 
@@ -994,9 +970,15 @@ io.on('connection', (socket) => {
         return socket.emit('reviewError', { message: 'Jugador no encontrado' });
       }
 
-      // Validar voto
-      if (!['approve', 'reject'].includes(vote)) {
-        return socket.emit('reviewError', { message: 'Voto inválido' });
+      // Validaciones críticas
+      if (!playerName || !category || typeof isValid !== 'boolean') {
+        return socket.emit('reviewError', { message: 'Datos de voto inválidos' });
+      }
+
+      // PREVENIR AUTO-VOTO (doble verificación)
+      if (playerName === player.name || playerName === voter) {
+        logEvent({ socket, event: 'castVote', level: 'warn', message: `Intento de auto-voto bloqueado: ${player.name}` });
+        return socket.emit('reviewError', { message: 'No puedes votar por tu propia palabra' });
       }
 
       // Verificar que no sea su propia palabra
@@ -1080,15 +1062,80 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Finalizar revisión (solo host)
-  socket.on('finishReview', ({ roomId }) => {
+  // Handler personalizado para nuestro sistema de votación
+  socket.on('castVoteCustom', ({ roomId, playerName, category, isValid, voter }) => {
     try {
+      console.log(`🗳️ [SERVER] Voto personalizado:`, { roomId, playerName, category, isValid, voter });
+      
       const gameState = gameStates[roomId];
-      if (!gameState || !gameState.reviewData) return;
+      if (!gameState || gameState.roundPhase !== 'review') {
+        return socket.emit('reviewError', { message: 'Revisión no disponible' });
+      }
 
       const player = gameState.players.find(p => p.id === socket.id);
-      if (!player?.isCreator) {
-        return socket.emit('reviewError', { message: 'Solo el host puede finalizar la revisión' });
+      if (!player) {
+        return socket.emit('reviewError', { message: 'Jugador no encontrado' });
+      }
+
+      // Prevenir auto-voto
+      if (playerName === player.name) {
+        return socket.emit('reviewError', { message: 'No puedes votar por tu propia palabra' });
+      }
+
+      // Inicializar estructura si no existe
+      if (!gameState.customVotes) gameState.customVotes = {};
+      const wordKey = `${playerName}-${category}`;
+      if (!gameState.customVotes[wordKey]) {
+        gameState.customVotes[wordKey] = { valid: [], invalid: [] };
+      }
+
+      // Remover voto anterior
+      gameState.customVotes[wordKey].valid = gameState.customVotes[wordKey].valid.filter(v => v !== player.name);
+      gameState.customVotes[wordKey].invalid = gameState.customVotes[wordKey].invalid.filter(v => v !== player.name);
+
+      // Agregar nuevo voto
+      gameState.customVotes[wordKey][isValid ? 'valid' : 'invalid'].push(player.name);
+
+      // Broadcast actualización
+      io.to(roomId).emit('voteUpdate', {
+        wordId: wordKey,
+        playerName,
+        category,
+        validCount: gameState.customVotes[wordKey].valid.length,
+        invalidCount: gameState.customVotes[wordKey].invalid.length,
+        voter: player.name,
+        isValid
+      });
+
+      logEvent({ socket, event: 'castVoteCustom', roomId, message: `${player.name} votó ${isValid ? 'válida' : 'inválida'} para ${playerName}/${category}` });
+    } catch (error) {
+      console.error('[CastVoteCustom] Error:', error);
+    }
+  });
+
+  // Finalizar revisión - COMPATIBLE CON FRONTEND
+  socket.on('finishReview', ({ roomId, votingResults }) => {
+    try {
+      console.log(`✅ [SERVER] Finalizando revisión:`, { roomId, votingResults });
+      
+      const gameState = gameStates[roomId];
+      if (!gameState) return;
+
+      const player = gameState.players.find(p => p.id === socket.id);
+      if (!player) return;
+
+      // Procesar resultados de votación si se proporcionan
+      if (votingResults) {
+        console.log(`📊 [SERVER] Procesando ${Object.keys(votingResults).length} resultados de votación`);
+        
+        // Aplicar resultados de votación a validWords
+        Object.entries(votingResults).forEach(([wordKey, result]) => {
+          const [playerName, category] = wordKey.split('-');
+          if (!gameState.validWords[playerName]) {
+            gameState.validWords[playerName] = {};
+          }
+          gameState.validWords[playerName][category] = result.isValid;
+        });
       }
 
       // Procesar resultados finales
@@ -1112,13 +1159,30 @@ io.on('connection', (socket) => {
         gameState.isPlaying = false;
         gameState.roundPhase = 'ended';
         
+        // FASE 4: Actualizar estadísticas al finalizar juego
+        gameState.players.forEach(player => {
+          if (player.connected) {
+            const wordsSubmitted = gameState.categories ? 
+              gameState.categories.filter(cat => gameState.words[player.name]?.[cat]?.trim()).length : 0;
+            
+            updatePlayerStats(player.name, {
+              wordsSubmitted: wordsSubmitted,
+              categories: gameState.categories,
+              streakBonus: gameState.currentStreakBonuses?.[player.name]?.multiplier > 1.0,
+              socialPressure: true, // Asumimos que experimentó presión social
+              playTime: Math.round((Date.now() - (gameState.gameStartedAt || Date.now())) / 1000)
+            });
+          }
+        });
+
         io.to(roomId).emit('gameEnded', {
           finalResults,
           playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })).sort((a, b) => b.score - a.score),
-          totalRounds: gameState.currentRound
+          totalRounds: gameState.currentRound,
+          statsUpdated: true
         });
         
-        logEvent({ socket, event: 'gameEnded', roomId, message: `Juego finalizado después de ${gameState.currentRound} rondas` });
+        logEvent({ socket, event: 'gameEnded', roomId, message: `Juego finalizado después de ${gameState.currentRound} rondas. Estadísticas actualizadas.` });
       } else {
         // Preparar siguiente ronda
         gameState.words = {};
@@ -1285,13 +1349,49 @@ function startTimer(roomId) {
   // Notificar tiempo inicial
   io.to(roomId).emit('timerUpdate', { timeRemaining: gameState.timeRemaining, serverTime: Date.now(), endsAt: gameState.timerEndsAt });
   
-  // Iniciar nuevo temporizador (servidor como fuente de verdad)
+  // FASE 4: SOCIAL PRESSURE TIMER - Timer inteligente que acelera con presión social
   gameState.timer = setInterval(() => {
     const remaining = Math.max(0, Math.ceil((gameState.timerEndsAt - Date.now()) / 1000));
     gameState.timeRemaining = remaining;
     
-    // Notificar actualización de tiempo
-    io.to(roomId).emit('timerUpdate', { timeRemaining: gameState.timeRemaining, serverTime: Date.now(), endsAt: gameState.timerEndsAt });
+    // Calcular presión social
+    const activePlayers = getActivePlayers(gameState);
+    const totalPlayers = getConnectedPlayers(gameState).length;
+    const completionRate = getCompletionRate(gameState);
+    
+    // Aplicar multiplicador de presión
+    let pressureMultiplier = 1.0;
+    let pressureReason = 'normal';
+    
+    if (activePlayers <= 2 && totalPlayers > 2) {
+      pressureMultiplier = 1.5;
+      pressureReason = 'few_active';
+    } else if (activePlayers === 1 && totalPlayers > 1) {
+      pressureMultiplier = 2.0;
+      pressureReason = 'last_player';
+    }
+    
+    if (completionRate > 0.7 && pressureMultiplier === 1.0) {
+      pressureMultiplier = 1.3;
+      pressureReason = 'most_completed';
+    }
+    
+    // Ajustar tiempo si hay presión (acelerar el countdown)
+    if (pressureMultiplier > 1.0 && gameState.timeRemaining > 10) {
+      gameState.timerEndsAt -= (pressureMultiplier - 1.0) * 1000;
+    }
+    
+    // Notificar actualización de tiempo con información de presión
+    io.to(roomId).emit('timerUpdate', { 
+      timeRemaining: gameState.timeRemaining, 
+      serverTime: Date.now(), 
+      endsAt: gameState.timerEndsAt,
+      pressureMultiplier: pressureMultiplier,
+      pressureReason: pressureReason,
+      activePlayers: activePlayers,
+      totalPlayers: totalPlayers,
+      isUnderPressure: pressureMultiplier > 1.1
+    });
     
     // Si se acabó el tiempo
     if (remaining <= 0) {
@@ -1883,6 +1983,336 @@ server.listen(PORT, '0.0.0.0', () => {
     }
   }
 }
+
+// FASE 4: FUNCIONES AUXILIARES PARA SOCIAL PRESSURE TIMER
+
+// Obtener jugadores que aún están escribiendo (no han enviado todas las palabras)
+function getActivePlayers(gameState) {
+  if (!gameState.words || !gameState.categories) return gameState.players.length;
+  
+  let activePlayers = 0;
+  gameState.players.forEach(player => {
+    if (!player.connected) return;
+    
+    const playerWords = gameState.words[player.name] || {};
+    const wordsCompleted = gameState.categories.filter(cat => 
+      playerWords[cat] && playerWords[cat].trim().length > 0
+    ).length;
+    
+    // Considerar activo si no ha completado todas las palabras
+    if (wordsCompleted < gameState.categories.length) {
+      activePlayers++;
+    }
+  });
+  
+  return Math.max(1, activePlayers); // Mínimo 1 para evitar división por 0
+}
+
+// Calcular tasa de completado general
+function getCompletionRate(gameState) {
+  if (!gameState.words || !gameState.categories || gameState.players.length === 0) return 0;
+  
+  let totalPossibleWords = 0;
+  let completedWords = 0;
+  
+  gameState.players.forEach(player => {
+    if (!player.connected) return;
+    
+    totalPossibleWords += gameState.categories.length;
+    const playerWords = gameState.words[player.name] || {};
+    completedWords += gameState.categories.filter(cat => 
+      playerWords[cat] && playerWords[cat].trim().length > 0
+    ).length;
+  });
+  
+  return totalPossibleWords > 0 ? completedWords / totalPossibleWords : 0;
+}
+
+// FASE 4: LETTER STREAK SYSTEM - Sistema de bonificación por letras difíciles
+
+const RARE_LETTERS = ['K', 'Q', 'W', 'X', 'Y', 'Z'];
+const MEDIUM_LETTERS = ['J', 'Ñ', 'V'];
+
+function calculateLetterStreakBonus(gameState) {
+  if (!gameState.letterHistory || gameState.letterHistory.length < 2) return {};
+  
+  const streakBonuses = {};
+  
+  // Verificar últimas 4 letras para detectar rachas
+  const recentLetters = gameState.letterHistory.slice(-4);
+  let consecutiveRare = 0;
+  let consecutiveMedium = 0;
+  
+  for (let i = recentLetters.length - 1; i >= 0; i--) {
+    const letter = recentLetters[i];
+    
+    if (RARE_LETTERS.includes(letter)) {
+      consecutiveRare++;
+      consecutiveMedium++; // Letras raras también cuentan como medium
+    } else if (MEDIUM_LETTERS.includes(letter)) {
+      consecutiveMedium++;
+      break; // No continuar con raras si encontramos medium
+    } else {
+      break; // Romper la racha
+    }
+  }
+  
+  // Calcular multiplicadores
+  let streakMultiplier = 1.0;
+  let streakType = 'none';
+  
+  if (consecutiveRare >= 2) {
+    streakMultiplier = 1.2 + (consecutiveRare - 2) * 0.3; // 1.2x, 1.5x, 1.8x...
+    streakType = 'rare';
+  } else if (consecutiveMedium >= 3) {
+    streakMultiplier = 1.15 + (consecutiveMedium - 3) * 0.15; // 1.15x, 1.3x...
+    streakType = 'medium';
+  }
+  
+  // Aplicar bonus a todos los jugadores conectados
+  gameState.players.forEach(player => {
+    if (player.connected) {
+      streakBonuses[player.name] = {
+        multiplier: streakMultiplier,
+        type: streakType,
+        consecutiveCount: streakType === 'rare' ? consecutiveRare : consecutiveMedium,
+        currentLetter: gameState.currentLetter
+      };
+    }
+  });
+  
+  return streakBonuses;
+}
+
+function isRareLetter(letter) {
+  return RARE_LETTERS.includes(letter?.toUpperCase());
+}
+
+function isMediumLetter(letter) {
+  return MEDIUM_LETTERS.includes(letter?.toUpperCase());
+}
+
+// Función centralizada para generar letras con tracking de historial
+function generateLetterWithHistory(gameState) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const newLetter = alphabet[Math.floor(Math.random() * alphabet.length)];
+  
+  // Inicializar historial si no existe
+  if (!gameState.letterHistory) {
+    gameState.letterHistory = [];
+  }
+  
+  // Agregar nueva letra al historial
+  gameState.letterHistory.push(newLetter);
+  
+  // Mantener solo las últimas 10 letras para performance
+  if (gameState.letterHistory.length > 10) {
+    gameState.letterHistory = gameState.letterHistory.slice(-10);
+  }
+  
+  gameState.currentLetter = newLetter;
+  
+  // Calcular bonus de racha si aplica
+  const streakBonuses = calculateLetterStreakBonus(gameState);
+  gameState.currentStreakBonuses = streakBonuses;
+  
+  console.log(`🔤 [LETTER STREAK] Nueva letra: ${newLetter}, Historial: [${gameState.letterHistory.join(', ')}]`);
+  if (Object.keys(streakBonuses).length > 0) {
+    console.log(`⚡ [LETTER STREAK] Bonus activo:`, Object.values(streakBonuses)[0]);
+  }
+  
+  return {
+    letter: newLetter,
+    streakBonuses: streakBonuses,
+    letterHistory: gameState.letterHistory.slice(-5), // Enviar últimas 5 al cliente
+    isRare: isRareLetter(newLetter),
+    isMedium: isMediumLetter(newLetter)
+  };
+}
+
+// FASE 4: SISTEMA DE ESTADÍSTICAS BÁSICO
+
+// Storage temporal de estadísticas (en producción usar Redis/MongoDB)
+const playerStats = {};
+
+function initializePlayerStats(playerName) {
+  if (!playerStats[playerName]) {
+    playerStats[playerName] = {
+      gamesPlayed: 0,
+      wordsCompleted: 0,
+      averageWordsPerGame: 0,
+      favoriteCategories: {},
+      streakBonusesEarned: 0,
+      socialPressuresSurvived: 0,
+      fastestWordTime: null,
+      longestStreak: 0,
+      validationAccuracy: 0,
+      totalPlayTime: 0,
+      lastPlayed: new Date(),
+      achievements: []
+    };
+  }
+  return playerStats[playerName];
+}
+
+function updatePlayerStats(playerName, gameData) {
+  const stats = initializePlayerStats(playerName);
+  
+  stats.gamesPlayed++;
+  stats.wordsCompleted += gameData.wordsSubmitted || 0;
+  stats.averageWordsPerGame = stats.wordsCompleted / stats.gamesPlayed;
+  
+  // Categorías favoritas
+  if (gameData.categories) {
+    gameData.categories.forEach(category => {
+      stats.favoriteCategories[category] = (stats.favoriteCategories[category] || 0) + 1;
+    });
+  }
+  
+  // Bonuses y logros
+  if (gameData.streakBonus) stats.streakBonusesEarned++;
+  if (gameData.socialPressure) stats.socialPressuresSurvived++;
+  if (gameData.playTime) stats.totalPlayTime += gameData.playTime;
+  
+  stats.lastPlayed = new Date();
+  
+  console.log(`📊 [STATS] Estadísticas actualizadas para ${playerName}:`, {
+    gamesPlayed: stats.gamesPlayed,
+    wordsCompleted: stats.wordsCompleted,
+    averageWordsPerGame: Math.round(stats.averageWordsPerGame * 10) / 10
+  });
+  
+  return stats;
+}
+
+function getPlayerStats(playerName) {
+  return playerStats[playerName] || initializePlayerStats(playerName);
+}
+
+function getGlobalStats() {
+  const totalPlayers = Object.keys(playerStats).length;
+  const totalGames = Object.values(playerStats).reduce((sum, stats) => sum + stats.gamesPlayed, 0);
+  const totalWords = Object.values(playerStats).reduce((sum, stats) => sum + stats.wordsCompleted, 0);
+  
+  return {
+    totalPlayers,
+    totalGames,
+    totalWords,
+    averageWordsPerGame: totalGames > 0 ? Math.round((totalWords / totalGames) * 10) / 10 : 0,
+    activeToday: Object.values(playerStats).filter(stats => {
+      const today = new Date();
+      const lastPlayed = new Date(stats.lastPlayed);
+      return today.toDateString() === lastPlayed.toDateString();
+    }).length
+  };
+}
+
+// Endpoint para obtener estadísticas
+app.get('/api/stats/:playerName', (req, res) => {
+  try {
+    const playerName = req.params.playerName;
+    const stats = getPlayerStats(playerName);
+    res.json({
+      success: true,
+      stats: stats,
+      global: getGlobalStats()
+    });
+  } catch (error) {
+    console.error('Error obteniendo estadísticas:', error);
+    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+  }
+});
+
+// FASE 4: SISTEMA DE FEEDBACK - Storage temporal de feedback
+const feedbackStorage = [];
+const bugReports = [];
+
+// Endpoint para enviar feedback
+app.post('/api/feedback', (req, res) => {
+  try {
+    const { playerName, rating, message, type } = req.body;
+    
+    if (!playerName || !rating || !type) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Datos incompletos: playerName, rating y type son requeridos' 
+      });
+    }
+    
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Rating debe estar entre 1 y 5' 
+      });
+    }
+    
+    const feedback = {
+      id: Date.now().toString(),
+      playerName: playerName,
+      rating: parseInt(rating),
+      message: message || '',
+      type: type, // 'game', 'bug', 'suggestion'
+      timestamp: new Date().toISOString(),
+      userAgent: req.headers['user-agent'] || 'Unknown',
+      ip: req.ip || req.connection.remoteAddress
+    };
+    
+    if (type === 'bug') {
+      bugReports.push(feedback);
+      console.log(`🐛 [FEEDBACK] Nuevo reporte de bug de ${playerName}:`, message);
+    } else {
+      feedbackStorage.push(feedback);
+      console.log(`💬 [FEEDBACK] Nuevo feedback de ${playerName}: ${rating}⭐ - ${type}`);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Feedback recibido correctamente',
+      id: feedback.id
+    });
+    
+  } catch (error) {
+    console.error('Error procesando feedback:', error);
+    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+  }
+});
+
+// Endpoint para obtener estadísticas de feedback (admin)
+app.get('/api/feedback/stats', (req, res) => {
+  try {
+    const totalFeedbacks = feedbackStorage.length;
+    const totalBugs = bugReports.length;
+    
+    const averageRating = totalFeedbacks > 0 ? 
+      feedbackStorage.reduce((sum, f) => sum + f.rating, 0) / totalFeedbacks : 0;
+    
+    const feedbackByType = feedbackStorage.reduce((acc, f) => {
+      acc[f.type] = (acc[f.type] || 0) + 1;
+      return acc;
+    }, {});
+    
+    const ratingDistribution = feedbackStorage.reduce((acc, f) => {
+      acc[f.rating] = (acc[f.rating] || 0) + 1;
+      return acc;
+    }, {});
+    
+    res.json({
+      success: true,
+      stats: {
+        totalFeedbacks,
+        totalBugs,
+        averageRating: Math.round(averageRating * 10) / 10,
+        feedbackByType,
+        ratingDistribution,
+        recentFeedbacks: feedbackStorage.slice(-10).reverse(),
+        recentBugs: bugReports.slice(-5).reverse()
+      }
+    });
+  } catch (error) {
+    console.error('Error obteniendo estadísticas de feedback:', error);
+    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+  }
+});
 
 // Export para pruebas
 module.exports = { server, io };

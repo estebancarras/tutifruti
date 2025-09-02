@@ -298,20 +298,36 @@ MES 18:  100,000 usuarios → $120K MRR
 - [ ] Tests coverage >90%
 - [ ] Performance optimizado
 
-### 🎮 FASE 4: MECÁNICAS INNOVADORAS (Semanas 7-8)
-**OBJETIVO:** Diferenciación competitiva
+### 🎮 FASE 4: OPTIMIZACIÓN HÍBRIDA (Semanas 7-8)
+**OBJETIVO:** Balance entre estabilización e innovación
 
-#### NUEVAS FEATURES
-- [ ] **Letter Streak System**
+#### PRIORIDAD 1: ESTABILIZACIÓN (70% esfuerzo)
+- [ ] **Corrección bugs restantes**
+  - Testing exhaustivo sistema votación
+  - Optimización reconexiones
+  - Performance en revisión mejorada
+- [ ] **Responsive móvil real**
+  - Grid adaptativo 2x2 + tabs
+  - Touch interactions optimizadas
+  - Navegación móvil fluida
+- [ ] **Pulimiento visual**
+  - Animaciones suaves en votación
+  - Micro-interacciones
+  - Estados de carga mejorados
+
+#### PRIORIDAD 2: INNOVACIÓN SELECTIVA (30% esfuerzo)
 - [ ] **Social Pressure Timer**
-- [ ] **Word Evolution Chain**
-- [ ] **Battle Mode 1v1**
+  - Timer acelera con pocos jugadores
+  - Presión visual creciente
+- [ ] **Letter Streak System simplificado**
+  - Bonus letras difíciles (K,W,X,Y,Z)
+  - Multiplicador visual claro
 
 #### ENTREGABLES FASE 4
-- [ ] 4 mecánicas innovadoras live
-- [ ] A/B testing implementado
-- [ ] Metrics tracking completo
-- [ ] User feedback positivo
+- [ ] Sistema estable sin bugs críticos
+- [ ] UX móvil optimizada
+- [ ] 2 mecánicas innovadoras funcionando
+- [ ] Performance >95% uptime
 
 ### 💰 FASE 5: MONETIZACIÓN (Semanas 9-12)
 **OBJETIVO:** Revenue streams activados
