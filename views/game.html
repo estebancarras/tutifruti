@@ -1528,12 +1528,24 @@
     function initializeMobileTabs() {
       try {
         const isMobile = window.innerWidth <= 480;
-        if (!isMobile) return;
+        const isTouch = 'ontouchstart' in window;
+        const shouldUseMobile = isMobile && isTouch;
+        
+        if (!shouldUseMobile) {
+          console.log('📱 [GAME.HTML] No es dispositivo móvil, manteniendo grid desktop');
+          return;
+        }
         
         console.log('📱 [GAME.HTML] Inicializando navegación móvil por tabs...');
         
         const categoriesGrid = document.querySelector('.categories-grid-new');
         if (!categoriesGrid) return;
+        
+        // Verificar si ya está inicializado
+        if (categoriesGrid.style.display === 'none' || document.querySelector('.mobile-game-container')) {
+          console.log('📱 [GAME.HTML] Navegación móvil ya inicializada');
+          return;
+        }
         
         const categories = Array.from(categoriesGrid.children);
         if (categories.length === 0) return;
@@ -1653,9 +1665,44 @@
       });
     });
     
+    // Función para restaurar grid de escritorio
+    function restoreDesktopGrid() {
+      const categoriesGrid = document.querySelector('.categories-grid-new');
+      const mobileContainer = document.querySelector('.mobile-game-container');
+      
+      if (categoriesGrid && mobileContainer) {
+        categoriesGrid.style.display = '';
+        mobileContainer.remove();
+        console.log('🖥️ [GAME.HTML] Grid de escritorio restaurado');
+      }
+    }
+    
+    // Manejar cambios de tamaño de ventana
+    window.addEventListener('resize', () => {
+      const isMobile = window.innerWidth <= 480;
+      const isTouch = 'ontouchstart' in window;
+      const shouldUseMobile = isMobile && isTouch;
+      
+      if (!shouldUseMobile) {
+        restoreDesktopGrid();
+      } else {
+        setTimeout(initializeMobileTabs, 100);
+      }
+    });
+    
     // Reinicializar en cambio de orientación
     window.addEventListener('orientationchange', () => {
-      setTimeout(initializeMobileTabs, 300);
+      setTimeout(() => {
+        const isMobile = window.innerWidth <= 480;
+        const isTouch = 'ontouchstart' in window;
+        const shouldUseMobile = isMobile && isTouch;
+        
+        if (!shouldUseMobile) {
+          restoreDesktopGrid();
+        } else {
+          initializeMobileTabs();
+        }
+      }, 300);
     });
     
     // SISTEMA DE MICRO-INTERACCIONES - FASE 4

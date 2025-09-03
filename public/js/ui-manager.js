@@ -459,6 +459,9 @@ class UIManager {
     const grid = document.getElementById('categoriesGrid');
     if (!grid) return;
 
+    // Asegurar que el grid esté visible (protección contra ocultación móvil)
+    grid.style.display = '';
+    
     grid.innerHTML = '';
     categories.forEach((cat) => {
       const safeId = `input-${cat}`;
