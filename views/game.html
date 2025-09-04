@@ -854,6 +854,13 @@
         if (confirmBtn) {
           confirmBtn.addEventListener('click', () => {
             console.log('🔄 [GAME.HTML] Usuario confirmó votación...');
+            
+            // Prevenir múltiples envíos
+            if (votingState.resultsSent) {
+              console.warn('🚫 [GAME.HTML] Resultados ya enviados, ignorando click');
+              return;
+            }
+            
             confirmVotingResults();
           });
         }
@@ -955,6 +962,7 @@
             
             // LÓGICA JUSTA: Verificar si el usuario actual es el autor de esta palabra
             const isOwnWord = player.name === votingState.currentUser;
+            console.log(`🔍 [GAME.HTML] Verificando palabra: ${player.name} vs ${votingState.currentUser} = ${isOwnWord}`);
             
             const playerVoteCard = document.createElement('div');
             playerVoteCard.style.cssText = `
@@ -1169,10 +1177,17 @@
           gameContainer.style.display = 'block';
         }
         
-        // Notificar al servidor que terminamos la revisión
-        socketManager.emit('finishReview', { roomId: gameState.roomId });
+        // Limpiar estado de votación para evitar conflictos
+        votingState = {
+          votes: {},
+          currentUser: null,
+          currentLetter: null,
+          isVoting: false,
+          resultsSent: false
+        };
         
-        showNotification('Revisión completada', 'success');
+        // NO mostrar notificación aquí para evitar espameo
+        // showNotification('Revisión completada', 'success');
         
       } catch (error) {
         console.error('❌ [GAME.HTML] Error finalizando revisión:', error);
@@ -1276,7 +1291,14 @@
         console.log('🔧 [GAME.HTML] Inicializando estado de votación...');
         
         votingState.totalPlayers = data.players?.length || 0;
-        votingState.currentUser = gameState.playerName;
+        
+        // Obtener nombre del usuario actual de múltiples fuentes
+        votingState.currentUser = gameState.playerName || 
+                                 localStorage.getItem('playerName') || 
+                                 document.querySelector('[data-player-name]')?.dataset.playerName ||
+                                 'Usuario';
+        
+        console.log(`👤 [GAME.HTML] Usuario actual identificado: ${votingState.currentUser}`);
         votingState.votes = {};
         
         // Inicializar votos para cada palabra - CON MEJORAS
@@ -1311,9 +1333,20 @@
     window.castVoteForWord = function(playerName, category, isValid) {
       try {
         console.log(`🗳️ [GAME.HTML] Intento de voto: ${playerName}-${category} = ${isValid ? 'VÁLIDA' : 'INVÁLIDA'}`);
+        console.log(`🔍 [GAME.HTML] Usuario actual: ${votingState.currentUser}, Jugador objetivo: ${playerName}`);
         
         // VERIFICACIÓN CRÍTICA: No permitir votar por palabras propias
-        if (playerName === votingState.currentUser) {
+        // Verificar múltiples fuentes para el nombre del usuario actual
+        const currentUserNames = [
+          votingState.currentUser,
+          gameState.playerName,
+          localStorage.getItem('playerName'),
+          document.querySelector('[data-player-name]')?.dataset.playerName
+        ].filter(Boolean);
+        
+        const isOwnWord = currentUserNames.includes(playerName);
+        
+        if (isOwnWord) {
           console.warn('🚫 [GAME.HTML] Intento de voto por palabra propia bloqueado');
           showNotification('No puedes votar por tu propia palabra', 'warning');
           return;
@@ -1501,12 +1534,15 @@
         
         console.log('📊 [GAME.HTML] Resultados compilados:', votingResults);
         
-        // Enviar resultados al servidor
+        // Enviar resultados al servidor (solo una vez)
         socketManager.emit('finishReview', {
           roomId: gameState.roomId,
           votingResults: votingResults,
           voter: votingState.currentUser
         });
+        
+        // Marcar que ya se envió para evitar duplicados
+        votingState.resultsSent = true;
         
         // Mostrar feedback visual
         const confirmBtn = document.getElementById('confirm-votes-btn');

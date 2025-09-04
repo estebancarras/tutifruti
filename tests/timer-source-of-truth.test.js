@@ -67,7 +67,7 @@ describe('Temporizador servidor', () => {
     });
 
     // Iniciar juego - ahora genera letra automáticamente
-    host.emit('startGame');
+        host.emit('startGame');
     const roundStart = await waitForEvent(host, 'roundStart', 10000);
     expect(roundStart).toHaveProperty('letter');
     refs.letter = roundStart.letter;
