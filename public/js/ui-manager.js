@@ -462,11 +462,27 @@ class UIManager {
     // Asegurar que el grid esté visible (protección contra ocultación móvil)
     grid.style.display = '';
     
+    // Verificar si es la primera vez que se renderiza
+    const isFirstRender = !grid.hasAttribute('data-rendered');
+    if (isFirstRender) {
+      grid.setAttribute('data-rendered', 'true');
+    }
+    
+    // Preservar valores existentes antes de limpiar
+    const existingValues = {};
+    grid.querySelectorAll('.word-input').forEach(input => {
+      const category = input.dataset.category;
+      if (category && input.value) {
+        existingValues[category] = input.value;
+      }
+    });
+    
     grid.innerHTML = '';
     categories.forEach((cat) => {
       const safeId = `input-${cat}`;
       const card = document.createElement('div');
-      card.className = 'category-card';
+      // Solo aplicar animación de entrada en la primera carga
+      card.className = isFirstRender ? 'category-card initial-load' : 'category-card';
 
       card.innerHTML = `
         <div class="category-card__title">${cat}</div>
@@ -482,6 +498,18 @@ class UIManager {
         </div>
       `;
       grid.appendChild(card);
+      
+      // Restaurar valor si existía
+      if (existingValues[cat]) {
+        const input = card.querySelector('.word-input');
+        if (input) {
+          input.value = existingValues[cat];
+          // Marcar como completada si tiene valor
+          if (input.value.trim()) {
+            card.classList.add('completed');
+          }
+        }
+      }
     });
   }
 
