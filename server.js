@@ -56,6 +56,7 @@ setInterval(() => {
               }
             }
           });
+
         }
       });
     }
@@ -244,6 +245,7 @@ const createGameState = (roomId, maxPlayers = 5) => {
     reviewDuration: Math.floor(REVIEW_TIME_MS / 1000),
     reviewEndsAt: null,
     votes: {}, // { [playerName]: { [category]: { valid: Set|[], invalid: Set|[] } } }
+    reviewData: null, // se inicializa al entrar en revisión
     creator: null,
     private: false,
     password: null,
@@ -415,7 +417,7 @@ io.on('connection', (socket) => {
   });
 
   // Crear una nueva sala
-  socket.on('createRoom', ({ playerName, roomName, maxPlayers, isPrivate, password, rounds }) => {
+  socket.on('createRoom', ({ playerName, roomName, maxPlayers, isPrivate, password, rounds, categoriesCount, timeLimit, reviewTime }) => {
     if (!checkRateLimit(socket, 'createRoom', 2, 60_000)) {
       logEvent({ socket, event: 'createRoom', level: 'warn', message: 'Rate limit' });
       return socket.emit('error', { message: 'Demasiadas solicitudes para crear sala. Intenta de nuevo en un momento.' });
@@ -444,6 +446,17 @@ io.on('connection', (socket) => {
     // Configurar número de rondas (1..20)
     const parsedRounds = (typeof rounds === 'number' && isFinite(rounds)) ? Math.floor(rounds) : NaN;
     gameStates[roomId].maxRounds = (!isNaN(parsedRounds) ? Math.max(1, Math.min(20, parsedRounds)) : 5);
+    // Configurar cantidad de categorías (4..12)
+    const DEFAULT_CATS = ['NOMBRE', 'ANIMAL', 'COSA', 'FRUTA', 'PAIS', 'COLOR', 'COMIDA', 'CIUDAD', 'PROFESION', 'MARCA', 'DEPORTE', 'PELICULA'];
+    const parsedCatCount = (typeof categoriesCount === 'number' && isFinite(categoriesCount)) ? Math.floor(categoriesCount) : NaN;
+    const catCount = (!isNaN(parsedCatCount) ? Math.max(4, Math.min(12, parsedCatCount)) : DEFAULT_CATS.length);
+    gameStates[roomId].categories = DEFAULT_CATS.slice(0, catCount);
+    // Configurar tiempos
+    const parsedTimeLimit = (typeof timeLimit === 'number' && isFinite(timeLimit)) ? Math.floor(timeLimit) : NaN;
+    gameStates[roomId].timeLimit = (!isNaN(parsedTimeLimit) ? Math.max(20, Math.min(180, parsedTimeLimit)) : 60);
+    gameStates[roomId].timeRemaining = gameStates[roomId].timeLimit;
+    const parsedReview = (typeof reviewTime === 'number' && isFinite(reviewTime)) ? Math.floor(reviewTime) : NaN;
+    gameStates[roomId].reviewDuration = (!isNaN(parsedReview) ? Math.max(15, Math.min(180, parsedReview)) : Math.floor(REVIEW_TIME_MS / 1000));
     
     // Añadir el primer jugador (creador)
     gameStates[roomId].players.push({
@@ -584,17 +597,21 @@ io.on('connection', (socket) => {
     // FASE 4: Generar letra con sistema de racha
     const letterData = generateLetterWithHistory(gameState);
       
-    // Emit directo sin ruleta - ROUNDSTART inmediato con datos de racha
-    io.to(roomId).emit('roundStart', {
-        letter: letterData.letter,
-        timeLimit: gameState.timeLimit,
-        streakBonuses: letterData.streakBonuses,
-        letterHistory: letterData.letterHistory,
-        isRare: letterData.isRare,
-        isMedium: letterData.isMedium,
+    // Emitir a todos en la sala, asegurando que el host también lo reciba
+    const roundPayload = {
+      letter: letterData.letter,
+      timeLimit: gameState.timeLimit,
+      streakBonuses: letterData.streakBonuses,
+      letterHistory: letterData.letterHistory,
+      isRare: letterData.isRare,
+      isMedium: letterData.isMedium,
       round: gameState.currentRound,
       categories: gameState.categories
-    });
+    };
+
+    // Envío robusto: uno para el resto, y uno explícito para el host
+    socket.broadcast.to(roomId).emit('roundStart', roundPayload);
+    socket.emit('roundStart', roundPayload);
     
     // Iniciar temporizador inmediatamente
     setTimeout(() => startTimer(roomId), 500);
@@ -670,16 +687,32 @@ io.on('connection', (socket) => {
       gameState.timerEndsAt = null;
       
       // Configurar datos de revisión
-      if (!gameState.reviewData) {
-        gameState.reviewData = {
-          votes: {},
-          currentPlayerIndex: 0,
-          reviewPhase: 'voting',
-          consensusReached: {},
-          timeRemaining: 60,
-          reviewStartedAt: Date.now()
-        };
+      const reviewSeconds = gameState.reviewDuration || 60;
+      gameState.reviewData = {
+        votes: {},
+        currentPlayerIndex: 0,
+        reviewPhase: 'voting',
+        consensusReached: {},
+        timeRemaining: reviewSeconds,
+        reviewStartedAt: Date.now(),
+        confirmedBy: new Set(),
+        intervalId: null
+      };
+      // Iniciar temporizador de revisión (auto-confirm a los X segundos)
+      if (gameState.reviewData.intervalId) {
+        clearInterval(gameState.reviewData.intervalId);
       }
+      gameState.reviewEndsAt = Date.now() + reviewSeconds * 1000;
+      gameState.reviewData.intervalId = setInterval(() => {
+        const remaining = Math.max(0, Math.floor((gameState.reviewEndsAt - Date.now()) / 1000));
+        gameState.reviewData.timeRemaining = remaining;
+        if (remaining <= 0) {
+          clearInterval(gameState.reviewData.intervalId);
+          gameState.reviewData.intervalId = null;
+          // Auto-confirmación al expirar el temporizador
+          finishReviewAutomatically(roomId);
+        }
+      }, 1000);
       
       // Encontrar el primer jugador con palabras para comenzar
       let startPlayerIndex = 0;
@@ -801,40 +834,8 @@ io.on('connection', (socket) => {
       return socket.emit('error', { message: 'Solo el anfitrión puede avanzar a la siguiente ronda' });
     }
     
-    // Consolidar validez por votos (mayoría simple; en empate, usar resoluciones del host si existen; si no, válida por defecto)
-    const finalValid = {};
-    const categories = gameState.categories || [];
-    
-    Object.keys(gameState.words || {}).forEach(playerName => {
-      finalValid[playerName] = finalValid[playerName] || {};
-      categories.forEach(cat => {
-        const word = (gameState.words[playerName] && gameState.words[playerName][cat]) || '';
-        if (!word) { finalValid[playerName][cat] = false; return; }
-        
-        // Primero: si no empieza por la letra, inválida
-        const isLetterValid = word.charAt(0).toUpperCase() === gameState.currentLetter;
-        if (!isLetterValid) { finalValid[playerName][cat] = false; return; }
-        
-        const voteBucket = (gameState.votes[playerName] && gameState.votes[playerName][cat]) || { valid: new Set(), invalid: new Set() };
-        // Convertir a números (si vinieran serializados previamente)
-        const validCount = (voteBucket.valid instanceof Set) ? voteBucket.valid.size : Array.isArray(voteBucket.valid) ? voteBucket.valid.length : 0;
-        const invalidCount = (voteBucket.invalid instanceof Set) ? voteBucket.invalid.size : Array.isArray(voteBucket.invalid) ? voteBucket.invalid.length : 0;
-        
-        if (validCount > invalidCount) {
-          finalValid[playerName][cat] = true;
-        } else if (invalidCount > validCount) {
-          finalValid[playerName][cat] = false;
-        } else {
-          // Empate: usar resolución del host si se proporcionó; de lo contrario, válida por defecto
-          const key = `${playerName}:${cat}`;
-          if (resolutions && Object.prototype.hasOwnProperty.call(resolutions, key)) {
-            finalValid[playerName][cat] = !!resolutions[key];
-          } else {
-            finalValid[playerName][cat] = true;
-          }
-        }
-      });
-    });
+    // Consolidación puede reutilizar la misma función de finalizeReview
+    const finalValid = consolidateVotes(gameState, resolutions);
     
     // Persistir validez final y emitir evento de cierre de revisión
     gameState.validWords = finalValid;
@@ -1066,6 +1067,28 @@ io.on('connection', (socket) => {
       advanceToNextPlayer(roomId);
     } catch (error) {
       console.error('[SkipCurrentPlayer] Error:', error);
+    }
+  });
+
+  // Confirmación por jugador: cerrar revisión cuando todos confirmen o esperar timeout
+  socket.on('confirmReview', () => {
+    try {
+      const roomId = socket.roomId;
+      const gameState = gameStates[roomId];
+      if (!gameState || gameState.roundPhase !== 'review' || !gameState.reviewData) return;
+      if (!gameState.reviewData.confirmedBy) gameState.reviewData.confirmedBy = new Set();
+      gameState.reviewData.confirmedBy.add(socket.playerName);
+      const connected = getConnectedPlayers(gameState).map(p => p.name);
+      const allConfirmed = connected.every(n => gameState.reviewData.confirmedBy.has(n));
+      if (allConfirmed) {
+        if (gameState.reviewData.intervalId) {
+          clearInterval(gameState.reviewData.intervalId);
+          gameState.reviewData.intervalId = null;
+        }
+        finishReviewAutomatically(roomId);
+      }
+    } catch (error) {
+      console.error('[confirmReview] Error:', error);
     }
   });
 

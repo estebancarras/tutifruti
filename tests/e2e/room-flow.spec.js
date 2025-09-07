@@ -16,7 +16,7 @@ test.describe('Flujo E2E: crear sala, unirse y arrancar juego', () => {
       console.log('📱 Navegando a index...');
       
       // HOST: ir a index y crear sala
-      await host.goto('https://tutifruti-3ii6.onrender.com', { timeout: 15000 });
+      await host.goto('http://localhost:3000/index.html', { timeout: 15000 });
       console.log('✅ Host llegó a index');
       
       await host.fill('#username', 'host-e2e');
@@ -32,12 +32,12 @@ test.describe('Flujo E2E: crear sala, unirse y arrancar juego', () => {
       
       // Obtener código de sala
       await host.waitForSelector('#roomCodeValue', { state: 'visible', timeout: 15000 });
-      const roomCode = await host.textContent('#roomCodeValue');
+      const roomCode = (await host.textContent('#roomCodeValue')) || '';
       console.log(`✅ Código de sala obtenido: ${roomCode}`);
       
       // GUEST: ir a index y unirse
       console.log('👥 Invitado se une...');
-      await guest.goto('https://tutifruti-3ii6.onrender.com', { timeout: 15000 });
+      await guest.goto('http://localhost:3000/index.html', { timeout: 15000 });
       await guest.fill('#username', 'guest-e2e');
       await guest.click('#joinRoomButton');
       

@@ -515,8 +515,8 @@ class UIManager {
 
   /**
    * Abre el modal de revisión/votación con la lista de palabras por categoría y jugador
-   * @param {{round:number, letter:string, categories:string[], words:Object, reviewTime:number}} data
-   * @param {{isHost:boolean}} options
+   * @param {{round?:number, letter?:string, categories?:string[], words?:Object, reviewTime?:number}} data
+   * @param {{isHost?:boolean}} options
    */
   openReviewModal(data, options = { isHost: false }) {
     const { categories = [], words = {}, letter = '', reviewTime = 20 } = data || {};
@@ -525,27 +525,31 @@ class UIManager {
     const modal = this.createModal('review', `Revisión de palabras (Letra: ${letter})`);
     const body = modal.querySelector('.modal__body');
 
-    // Construir contenido agrupado por categoría
-    let html = `<div class="review-header">
-                  <div class="review-timer" id="reviewTimer" aria-live="polite">${reviewTime}s</div>
-                  <p class="review-help">Vota ✅/❌ para validar o impugnar las palabras (no puedes votar tu propia palabra).</p>
-                </div>`;
+    // Encabezado
+    body.innerHTML = `
+      <div class="review-header">
+        <div class="review-title">Revisión de palabras</div>
+        <div class="review-timer"><span class="timer-label">Tiempo:</span> <span id="timeRemaining">${formatTime(reviewTime)}</span></div>
+      </div>
+    `;
 
+    // Contenido por categorías
+    let html = '';
     categories.forEach((cat) => {
-      html += `<section class="review-category">
-                 <h3 class="review-category__title">${cat} con "${letter}"</h3>
-                 <div class="review-category__list">`;
+      html += `
+        <section class="review-category">
+          <h3 class="review-category__title">${cat} con "${letter}"</h3>
+          <div class="review-category__list">`;
 
-      // Recorrer jugadores y su palabra en esta categoría
       Object.keys(words || {}).forEach((playerName) => {
         const w = (words[playerName] && words[playerName][cat]) || '';
-        const disabled = (localStorage.getItem('username') || '').toLowerCase() === playerName.toLowerCase();
+        const disabled = (localStorage.getItem('username') || '').toLowerCase() === String(playerName).toLowerCase();
         const itemId = `vote-${cat}-${playerName}`.replace(/\s+/g, '-');
 
         html += `
-          <div class="review-item" id="${itemId}">
+          <div class="review-item word-card" id="${itemId}">
             <div class="review-item__player">
-              <span class="avatar" aria-hidden="true">${playerName.charAt(0).toUpperCase()}</span>
+              <span class="avatar" aria-hidden="true">${String(playerName).charAt(0).toUpperCase()}</span>
               <span class="player-name">${playerName}</span>
             </div>
             <div class="review-item__word">${w || '<span class="muted">—</span>'}</div>
@@ -560,22 +564,18 @@ class UIManager {
         `;
       });
 
-      html += `  </div>
-               </section>`;
+      html += `</div></section>`;
     });
 
-    // Botón “Siguiente Ronda” solo para host
-    if (isHost) {
-      html += `
-        <div class="review-actions">
-          <button type="button" id="nextRoundButton" class="btn btn--primary">
-            Siguiente Ronda
-          </button>
-        </div>
-      `;
-    }
+    // Acciones
+    html += `
+      <div class="review-actions">
+        <button id="confirmReviewButton" class="btn btn--primary">Validar resultados</button>
+        ${isHost ? '<button id="nextRoundButton" class="btn btn--ghost">Siguiente ronda</button>' : ''}
+      </div>
+    `;
 
-    body.innerHTML = html;
+    body.insertAdjacentHTML('beforeend', html);
     this.openModal('review');
 
     // Wire de votos
@@ -583,20 +583,44 @@ class UIManager {
       btn.addEventListener('click', () => {
         const cat = btn.getAttribute('data-cat');
         const player = btn.getAttribute('data-player');
-        const voterName = localStorage.getItem('username') || '';
-        window.socketManager?.castVote({ roomId: localStorage.getItem('currentRoomId'), voterName, targetPlayer: player, category: cat, decision: 'valid' });
+        const voter = localStorage.getItem('username') || '';
+        if (voter.toLowerCase() === String(player).toLowerCase()) return;
+        const card = btn.closest('.review-item');
+        if (card) {
+          card.classList.add('voted-approve');
+          card.classList.remove('voted-reject');
+        }
+        window.socketManager?.castVoteCustom({
+          roomId: localStorage.getItem('currentRoomId'),
+          playerName: player,
+          category: cat,
+          isValid: true,
+          voter
+        });
       });
     });
     body.querySelectorAll('.vote-invalid').forEach((btn) => {
       btn.addEventListener('click', () => {
         const cat = btn.getAttribute('data-cat');
         const player = btn.getAttribute('data-player');
-        const voterName = localStorage.getItem('username') || '';
-        window.socketManager?.castVote({ roomId: localStorage.getItem('currentRoomId'), voterName, targetPlayer: player, category: cat, decision: 'invalid' });
+        const voter = localStorage.getItem('username') || '';
+        if (voter.toLowerCase() === String(player).toLowerCase()) return;
+        const card = btn.closest('.review-item');
+        if (card) {
+          card.classList.add('voted-reject');
+          card.classList.remove('voted-approve');
+        }
+        window.socketManager?.castVoteCustom({
+          roomId: localStorage.getItem('currentRoomId'),
+          playerName: player,
+          category: cat,
+          isValid: false,
+          voter
+        });
       });
     });
 
-    // Wire “Siguiente Ronda”
+    // Siguiente ronda (solo host)
     const nextBtn = body.querySelector('#nextRoundButton');
     if (nextBtn) {
       nextBtn.addEventListener('click', () => {
@@ -605,13 +629,29 @@ class UIManager {
       });
     }
 
-    // Contador visual (solo UI; el servidor cierra igualmente)
-    let remaining = reviewTime;
-    const timerEl = body.querySelector('#reviewTimer');
-    if (timerEl) {
+    // Confirmar resultados
+    const confirmBtn = body.querySelector('#confirmReviewButton');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', () => {
+        confirmBtn.disabled = true;
+        try {
+          window.socketManager?.confirmReview();
+          showNotification('Votación enviada. Esperando a otros jugadores...', 'info');
+        } catch (e) {
+          console.error('[UIManager] Error confirmando revisión:', e);
+          confirmBtn.disabled = false;
+        }
+      });
+    }
+
+    // Temporizador visual
+    const timerEl = body.querySelector('#timeRemaining');
+    let remaining = Number(reviewTime) || 0;
+    if (timerEl && remaining > 0) {
+      timerEl.textContent = formatTime(remaining);
       const interval = setInterval(() => {
         remaining = Math.max(0, remaining - 1);
-        timerEl.textContent = `${remaining}s`;
+        timerEl.textContent = formatTime(remaining);
         if (remaining <= 0) clearInterval(interval);
       }, 1000);
     }
@@ -642,3 +682,8 @@ class UIManager {
 
 // Exportar instancia singleton
 export const uiManager = new UIManager();
+
+// Exponer para pruebas E2E y uso externo controlado
+if (typeof window !== 'undefined') {
+  window.uiManager = uiManager;
+}

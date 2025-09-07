@@ -141,6 +141,9 @@
     import { storage, validateWord, showNotification } from '/utils/helpers.js';
     import { SOCKET_EVENTS, ROUTES, GAME_CONFIG } from '/utils/constants.js';
 
+    // Exponer uiManager explícitamente para pruebas E2E
+    window.uiManager = uiManager;
+
     // Referencias a elementos
     const startGameButton = document.getElementById('startGameButton');
     const submitWordButton = document.getElementById('submitWordButton');
@@ -331,6 +334,7 @@
       // Juego - NUEVO FLUJO: Solo ROUND_START
       socketManager.on(SOCKET_EVENTS.ROUND_START, handleRoundStart);
       socketManager.on(SOCKET_EVENTS.START_REVIEW, handleStartReview);
+      socketManager.on(SOCKET_EVENTS.REVIEW_DATA, handleReviewDataForModal);
       socketManager.on(SOCKET_EVENTS.TIMER_UPDATE, handleTimerUpdate);
       socketManager.on(SOCKET_EVENTS.ROUND_ENDED, handleRoundEnded);
       socketManager.on(SOCKET_EVENTS.GAME_ENDED, handleGameEnded);
@@ -590,52 +594,76 @@
 
     function handleStartReview(data) {
       try {
-        console.log('🔄 [GAME.HTML] Iniciando revisión social:', data);
-        console.log('🔄 [GAME.HTML] Estado actual del juego:', {
-          roomId: gameState.roomId,
-          isPlaying: gameState.isPlaying,
-          timeRemaining: gameState.timeRemaining
-        });
-        
-        // Bloquear entradas y botón de enviar
-        gameState.disableInputs();
-        if (submitWordButton) submitWordButton.disabled = true;
-        
-        // Mostrar notificación de transición
-        showNotification(data.message || '¡Hora de revisar las palabras!', 'info');
-        
-        // SOLUCIÓN DEFINITIVA: Implementar revisión 100% NATIVA
-        try {
-          console.log('🔄 [GAME.HTML] Implementando revisión NATIVA - SIN redirección...');
-          
-          // Ocultar interfaz de juego
-          const gameContainer = document.querySelector('.game-container');
-          if (gameContainer) {
-            gameContainer.style.display = 'none';
-          }
-          
-          // Implementar interfaz de revisión directamente
-          implementNativeReviewInterface(data);
-          
-        } catch (error) {
-          console.error('❌ [GAME.HTML] Error implementando revisión nativa:', error);
-          showNotification('Error al implementar revisión', 'error');
+        console.log('🔄 [GAME.HTML] START_REVIEW recibido. Solicitando REVIEW_DATA...');
+        if (gameState?.roomId) {
+          socketManager.getRoomState({ roomId: gameState.roomId });
         }
-        
       } catch (e) {
-        console.error('Error en handleStartReview:', e);
+        console.error('❌ [GAME.HTML] Error en handleStartReview:', e);
         showNotification('Error al iniciar la revisión', 'error');
       }
     }
 
-    // Función handleVoteUpdate removida - duplicada, se usa la versión más completa en línea 1195
+    // Nuevo: manejar REVIEW_DATA del servidor y abrir UI separada
+    function handleReviewDataForModal(payload) {
+      try {
+        console.log('📊 [GAME.HTML] REVIEW_DATA recibido para modal:', payload);
+        // Construir categorías a partir del payload (o usar las del estado si existen)
+        const categories = Array.from(new Set(
+          (payload.players || []).flatMap(p => (p.words || []).map(w => w.category))
+        ));
+        // Mapear palabras: { playerName: { category: word } }
+        const words = {};
+        (payload.players || []).forEach(p => {
+          words[p.name] = {};
+          (p.words || []).forEach(w => {
+            words[p.name][w.category] = w.word || '';
+          });
+        });
+        const reviewTime = (payload.timeRemaining || (payload.reviewTime || 60));
+        uiManager.openReviewModal({ categories, words, letter: payload.letter, reviewTime }, { isHost: !!gameState.isHost });
+      } catch (e) {
+        console.error('❌ [GAME.HTML] Error en handleReviewDataForModal:', e);
+        showNotification('Error al cargar revisión', 'error');
+      }
+    }
 
+    // Nuevo: adaptar actualizaciones de voto al UIManager
+    function handleVoteUpdate(data) {
+      try {
+        // Dos variantes de payload: (1) custom con playerName/category/validCount/invalidCount
+        // o (2) genérico con wordId y arrays approve/reject
+        if (typeof data.playerName === 'string' && typeof data.category === 'string') {
+          uiManager.updateVoteCounts({
+            targetPlayer: data.playerName,
+            category: data.category,
+            validCount: Number(data.validCount || 0),
+            invalidCount: Number(data.invalidCount || 0)
+          });
+        } else if (typeof data.wordId === 'string' && data.votes) {
+          const [playerName, categoryIndex] = String(data.wordId).split('-');
+          // Intentar derivar categoría por índice si existe en el estado
+          const category = (window.GAME_CATEGORIES || [])[Number(categoryIndex)] || '';
+          uiManager.updateVoteCounts({
+            targetPlayer: playerName,
+            category,
+            validCount: Array.isArray(data.votes.approve) ? data.votes.approve.length : 0,
+            invalidCount: Array.isArray(data.votes.reject) ? data.votes.reject.length : 0
+          });
+        }
+      } catch (e) {
+        console.error('❌ [GAME.HTML] Error en handleVoteUpdate:', e);
+      }
+    }
+
+    // Cerrar UI de revisión al terminar
     function handleReviewEnded(data) {
       try {
-        // Cerrar modal de revisión; los resultados llegarán por ROUND_ENDED
+        console.log('✅ [GAME.HTML] REVIEW_ENDED:', data);
         uiManager.closeReviewModal();
+        // Mostrar resultados si llegaron como roundEnded por separado
       } catch (e) {
-        console.error('Error en handleReviewEnded:', e);
+        console.error('❌ [GAME.HTML] Error en handleReviewEnded:', e);
       }
     }
 

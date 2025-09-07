@@ -326,6 +326,65 @@
             </span>
           </div>
 
+          <!-- Configuraciones avanzadas de sala -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="categoriesCount" class="form-label">
+                Cantidad de categorías
+              </label>
+              <input
+                type="number"
+                id="categoriesCount"
+                name="categoriesCount"
+                class="form-input"
+                value="10"
+                min="4"
+                max="12"
+                aria-describedby="categories-help"
+              >
+              <span id="categories-help" class="form-help">
+                Entre 4 y 12. Recomendado: 8–12 para partidas dinámicas.
+              </span>
+            </div>
+            <div class="form-group">
+              <label for="timeLimit" class="form-label">
+                Tiempo por ronda (segundos)
+              </label>
+              <input
+                type="number"
+                id="timeLimit"
+                name="timeLimit"
+                class="form-input"
+                value="60"
+                min="20"
+                max="180"
+                aria-describedby="timeLimit-help"
+              >
+              <span id="timeLimit-help" class="form-help">
+                Entre 20 y 180 segundos. Predeterminado: 60.
+              </span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="reviewTime" class="form-label">
+              Tiempo para votación (segundos)
+            </label>
+            <input
+              type="number"
+              id="reviewTime"
+              name="reviewTime"
+              class="form-input"
+              value="60"
+              min="15"
+              max="180"
+              aria-describedby="reviewTime-help"
+            >
+            <span id="reviewTime-help" class="form-help">
+              Límite para validar resultados. Si expira, se confirman automáticamente.
+            </span>
+          </div>
+
           <div class="form-group">
             <button type="submit" id="createRoomButton" class="btn btn--primary btn--full">
               <span aria-hidden="true">🚀</span>
@@ -398,6 +457,9 @@
     const playerNameInput = document.getElementById('playerName');
     const roomNameInput = document.getElementById('roomName');
     const roundsInput = document.getElementById('rounds');
+    const categoriesCountInput = document.getElementById('categoriesCount');
+    const timeLimitInput = document.getElementById('timeLimit');
+    const reviewTimeInput = document.getElementById('reviewTime');
     const createRoomButton = document.getElementById('createRoomButton');
     const roomTitle = document.getElementById('roomTitle');
     const roomCodeValue = document.getElementById('roomCodeValue');
@@ -445,6 +507,9 @@
       // Validación en tiempo real del formulario
       roomNameInput.addEventListener('input', validateForm);
       roundsInput.addEventListener('input', validateForm);
+      categoriesCountInput.addEventListener('input', validateForm);
+      timeLimitInput.addEventListener('input', validateForm);
+      reviewTimeInput.addEventListener('input', validateForm);
 
       // Copiar código
       copyCodeButton.addEventListener('click', copyRoomCode);
@@ -483,8 +548,15 @@
     function validateForm() {
       const roomName = roomNameInput.value.trim();
       const rounds = parseInt(roundsInput?.value, 10) || 5;
+      const categoriesCount = parseInt(categoriesCountInput?.value, 10) || 10;
+      const timeLimit = parseInt(timeLimitInput?.value, 10) || 60;
+      const reviewTime = parseInt(reviewTimeInput?.value, 10) || 60;
       
-      const isValid = roomName.length > 0 && rounds >= 1 && rounds <= 20;
+      const isValid = roomName.length > 0 
+        && rounds >= 1 && rounds <= 20
+        && categoriesCount >= 4 && categoriesCount <= 12
+        && timeLimit >= 20 && timeLimit <= 180
+        && reviewTime >= 15 && reviewTime <= 180;
       
       createRoomButton.disabled = !isValid;
       
@@ -545,6 +617,9 @@
       
       const username = storage.getUsername();
       const roomName = roomNameInput.value.trim() || `Sala de ${username}`;
+      const categoriesCount = Math.max(4, Math.min(12, parseInt(categoriesCountInput?.value, 10) || 10));
+      const timeLimit = Math.max(20, Math.min(180, parseInt(timeLimitInput?.value, 10) || 60));
+      const reviewTime = Math.max(15, Math.min(180, parseInt(reviewTimeInput?.value, 10) || 60));
       
       if (!username) {
         showNotification('Error: Usuario no válido', 'error');
@@ -561,7 +636,10 @@
         playerName: username,
         roomName: roomName,
         maxPlayers: GAME_CONFIG.MAX_PLAYERS,
-        rounds: Math.max(1, Math.min(20, parseInt(roundsInput?.value, 10) || 5))
+        rounds: Math.max(1, Math.min(20, parseInt(roundsInput?.value, 10) || 5)),
+        categoriesCount,
+        timeLimit,
+        reviewTime
       });
     }
 

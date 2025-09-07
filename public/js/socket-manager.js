@@ -77,6 +77,11 @@ class SocketManager {
       // Responder al heartbeat para mantener la conexión
       this.socket.emit('heartbeat_ack', { timestamp: data.timestamp });
     });
+
+    // Listener genérico para depuración
+    this.socket.onAny((event, ...args) => {
+      console.log(`[SOCKET.IO INCOMING] Event: ${event}`, args);
+    });
   }
 
   /**
@@ -276,6 +281,14 @@ class SocketManager {
   }
   
   /**
+   * Confirmación de revisión por jugador (nuevo flujo)
+   */
+  confirmReview() {
+    if (!this.socket || !this.isConnected) return;
+    this.socket.emit('confirmReview');
+  }
+  
+  /**
    * SOLUCIÓN RESILIENTE: Intenta reconexión automática
    */
   attemptReconnection() {
@@ -316,3 +329,7 @@ class SocketManager {
 
 // Exportar instancia singleton
 export const socketManager = new SocketManager();
+// Exponer para uso desde HTML inline o módulos de UI
+if (typeof window !== 'undefined') {
+  window.socketManager = socketManager;
+}
