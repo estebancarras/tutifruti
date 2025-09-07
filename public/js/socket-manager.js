@@ -82,6 +82,14 @@ class SocketManager {
     this.socket.onAny((event, ...args) => {
       console.log(`[SOCKET.IO INCOMING] Event: ${event}`, args);
     });
+
+    // Manejador para el inicio de la ronda
+    this.socket.on('roundStart', (data) => {
+      if (window.uiManager) {
+        window.uiManager.displaySelectedLetter(data.letter);
+        window.uiManager.renderCategoriesGrid(data.categories);
+      }
+    });
   }
 
   /**
