@@ -3,23 +3,19 @@
  * Contiene la lógica de negocio para la gestión de salas de juego.
  */
 
-import { Room } from '../models/Room.js';
+import { roomRepository } from '../repositories/roomRepository.js';
 
 class RoomService {
-  constructor() {
-    this.rooms = new Map(); // Almacena las salas por ID
-  }
-
   addRoom(room) {
-    this.rooms.set(room.id, room);
+    roomRepository.createRoom(room);
   }
 
   getRoom(roomId) {
-    return this.rooms.get(roomId);
+    return roomRepository.findRoom(roomId);
   }
 
   removeRoom(roomId) {
-    this.rooms.delete(roomId);
+    roomRepository.deleteRoom(roomId);
   }
 
   // Método para agregar un jugador a una sala
@@ -27,6 +23,7 @@ class RoomService {
     const room = this.getRoom(roomId);
     if (room) {
       room.players.push(playerData);
+      roomRepository.updateRoom(roomId, room);
       return room;
     }
     throw new Error('Room not found');

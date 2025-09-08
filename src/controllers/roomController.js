@@ -15,12 +15,7 @@ export const createRoom = (roomData) => {
 
 export const joinRoom = (roomId, playerData) => {
   // Lógica para unirse a una sala existente
-  const room = roomService.getRoom(roomId);
-  if (room) {
-    room.addPlayer(playerData);
-    return room;
-  }
-  throw new Error('Room not found');
+  return roomService.addPlayerToRoom(roomId, playerData);
 };
 
 export const getRoomState = (roomId) => {
