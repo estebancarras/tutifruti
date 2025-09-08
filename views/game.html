@@ -1237,38 +1237,7 @@
       }
     }
     
-    // Handler para actualizaciones de votos en tiempo real
-    function handleVoteUpdate(data) {
-      try {
-        console.log('🔄 [GAME.HTML] Actualización de voto recibida:', data);
-        
-        const { wordId, playerName, category, validCount, invalidCount, voter, isValid } = data;
-        
-        if (!wordId || !playerName || !category) return;
-        
-        // Actualizar estado local de votación
-        const key = `${playerName}-${category}`;
-        if (votingState.votes[key]) {
-          // Solo actualizar si el voto no es nuestro (evitar doble actualización)
-          if (voter !== votingState.currentUser) {
-            votingState.votes[key].valid = validCount || 0;
-            votingState.votes[key].invalid = invalidCount || 0;
-          }
-          
-          // Actualizar UI para esta palabra
-          updateVoteUIFromServer(playerName, category, validCount, invalidCount);
-        }
-        
-        // Mostrar notificación sutil de voto recibido
-        if (voter !== votingState.currentUser) {
-          const voteText = isValid ? 'válida' : 'inválida';
-          showNotification(`${voter} votó ${voteText} para ${playerName}`, 'info', 2000);
-        }
-        
-      } catch (error) {
-        console.error('❌ [GAME.HTML] Error procesando actualización de voto:', error);
-      }
-    }
+    // Handler para actualizaciones de votos en tiempo real - ELIMINADO (duplicado)
     
     // Actualizar UI desde datos del servidor
     function updateVoteUIFromServer(playerName, category, validCount, invalidCount) {
