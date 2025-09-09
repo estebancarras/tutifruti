@@ -79,6 +79,17 @@
     .words-grid {
       display: grid;
       gap: 15px;
+      grid-template-columns: 1fr;
+    }
+
+    .no-words-message {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 2px dashed #ddd;
     }
 
     .word-item {
@@ -281,10 +292,11 @@
     <!-- Instrucciones -->
     <div class="voting-instructions">
       <strong>📋 Instrucciones:</strong><br>
+      • Revisa las palabras de cada categoría de todos los jugadores<br>
       • Todas las palabras inician como <strong>válidas</strong> (interruptor verde)<br>
       • Haz clic en el interruptor para marcar una palabra como <strong>inválida</strong> (interruptor rojo)<br>
       • No puedes votar sobre tus propias palabras<br>
-      • Cuando termines, presiona "Validar Resultados"
+      • Cuando termines de revisar, presiona "Validar Resultados"
     </div>
 
     <!-- Contenedor de categorías -->
@@ -384,8 +396,14 @@
       // Inicializar votos (todas las palabras válidas por defecto)
       initializeVotes();
       
-      // Renderizar categorías
+      // Renderizar categorías con palabras
       renderCategories(data.categories || [], votingState.words);
+      
+      // Verificar si hay palabras para votar
+      const hasWordsToVote = Object.keys(votingState.votes).length > 0;
+      if (!hasWordsToVote) {
+        showNotification('No hay palabras para votar en esta ronda', 'info');
+      }
       
       // Iniciar timer
       startTimer();
@@ -423,6 +441,7 @@
         categoriesContainer.appendChild(categorySection);
         
         const wordsGrid = categorySection.querySelector('.words-grid');
+        let hasWordsInCategory = false;
         
         // Renderizar palabras de todos los jugadores
         Object.keys(words).forEach(playerName => {
@@ -430,6 +449,7 @@
           const isOwnWord = playerName === votingState.playerName;
           const key = `${playerName}-${category}`;
           
+          // Mostrar todas las palabras (incluso vacías) para transparencia completa
           const wordItem = document.createElement('div');
           wordItem.className = `word-item ${isOwnWord ? 'own-word' : 'valid'}`;
           wordItem.id = `word-${key}`;
@@ -442,24 +462,34 @@
                 <div class="word-text ${!word ? 'empty' : ''}">${word || '(sin palabra)'}</div>
               </div>
             </div>
-            <button 
-              class="vote-toggle ${isOwnWord ? 'disabled' : ''}" 
-              data-key="${key}"
-              ${isOwnWord ? 'disabled' : ''}
-            ></button>
-            <div class="vote-status ${isOwnWord ? 'own' : 'valid'}">
-              ${isOwnWord ? 'Tu palabra' : 'Válida'}
-            </div>
+            ${!isOwnWord && word ? `
+              <button 
+                class="vote-toggle" 
+                data-key="${key}"
+                title="Clic para marcar como inválida"
+              ></button>
+              <div class="vote-status valid">Válida</div>
+            ` : `
+              <div class="vote-status own">
+                ${isOwnWord ? 'Tu palabra' : 'Sin palabra'}
+              </div>
+            `}
           `;
           
           wordsGrid.appendChild(wordItem);
+          hasWordsInCategory = true;
           
-          // Agregar evento de clic si no es palabra propia
+          // Agregar evento de clic si no es palabra propia y tiene contenido
           if (!isOwnWord && word) {
             const toggle = wordItem.querySelector('.vote-toggle');
             toggle.addEventListener('click', () => toggleVote(key));
           }
         });
+        
+        // Si no hay palabras en esta categoría, mostrar mensaje
+        if (!hasWordsInCategory) {
+          wordsGrid.innerHTML = '<div class="no-words-message">No hay palabras en esta categoría</div>';
+        }
       });
     }
 
@@ -538,6 +568,7 @@
       // Cambiar color cuando quede poco tiempo
       if (votingState.timeRemaining <= 10) {
         votingTimerEl.style.color = '#f44336';
+        votingTimerEl.parentElement.style.background = 'rgba(244, 67, 54, 0.2)';
       }
     }
 
@@ -566,11 +597,24 @@
         return;
       }
 
+      // Verificar que el jugador haya revisado todas las palabras disponibles
+      const totalWordsToVote = Object.keys(votingState.votes).length;
+      if (totalWordsToVote === 0) {
+        showNotification('No hay palabras para validar en esta ronda', 'info');
+      }
+
       votingState.hasValidated = true;
       validateButton.disabled = true;
       validateButton.textContent = '✅ Validado';
+      validateButton.style.background = '#4caf50';
       
-      // Enviar validación al servidor
+      // Deshabilitar todos los toggles
+      document.querySelectorAll('.vote-toggle').forEach(toggle => {
+        toggle.disabled = true;
+        toggle.style.opacity = '0.5';
+      });
+      
+      // Enviar validación al servidor con los votos actuales
       socketManager.emit('validateVoting', {
         roomId: votingState.roomId,
         playerName: votingState.playerName,

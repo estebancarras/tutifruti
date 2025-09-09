@@ -1123,8 +1123,18 @@ io.on('connection', (socket) => {
         votingData.words[p.name] = {};
         gameState.categories.forEach(category => {
           const playerWords = gameState.words[p.name] || {};
-          votingData.words[p.name][category] = playerWords[category] || '';
+          const word = playerWords[category] || '';
+          votingData.words[p.name][category] = word;
         });
+      });
+
+      console.log(`📊 [SERVER] Datos de votación preparados:`, {
+        jugadores: Object.keys(votingData.words),
+        categorias: votingData.categories,
+        palabrasPorJugador: Object.keys(votingData.words).map(name => ({
+          jugador: name,
+          palabras: Object.values(votingData.words[name]).filter(w => w).length
+        }))
       });
 
       socket.emit('votingData', votingData);
