@@ -628,32 +628,7 @@
       }
     }
 
-    function handleVoteUpdate(data) {
-      try {
-        // Dos variantes de payload: (1) custom con playerName/category/validCount/invalidCount
-        // o (2) genérico con wordId y arrays approve/reject
-        if (typeof data.playerName === 'string' && typeof data.category === 'string') {
-          uiManager.updateVoteCounts({
-            targetPlayer: data.playerName,
-            category: data.category,
-            validCount: Number(data.validCount || 0),
-            invalidCount: Number(data.invalidCount || 0)
-          });
-        } else if (typeof data.wordId === 'string' && data.votes) {
-          const [playerName, categoryIndex] = String(data.wordId).split('-');
-          // Intentar derivar categoría por índice si existe en el estado
-          const category = (window.GAME_CATEGORIES || [])[Number(categoryIndex)] || '';
-          uiManager.updateVoteCounts({
-            targetPlayer: playerName,
-            category,
-            validCount: Array.isArray(data.votes.approve) ? data.votes.approve.length : 0,
-            invalidCount: Array.isArray(data.votes.reject) ? data.votes.reject.length : 0
-          });
-        }
-      } catch (e) {
-        console.error('❌ [GAME.HTML] Error en handleVoteUpdate:', e);
-      }
-    }
+    // La función handleVoteUpdate se ha movido a una sección centralizada del script para evitar duplicados.
 
     // Cerrar UI de revisión al terminar
     function handleReviewEnded(data) {
