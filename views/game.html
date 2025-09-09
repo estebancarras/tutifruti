@@ -230,11 +230,11 @@
       // Botón enviar palabras
       submitWordButton?.addEventListener('click', submitWordsClassic);
       
-      // Botón ¡BASTA! - Termina la ronda inmediatamente
+      // Botón ¡BASTA! - Termina la ronda y va directo a votación
       bastaButton?.addEventListener('click', () => {
-        console.log('🔥 ¡BASTA! presionado - terminando ronda inmediatamente');
+        console.log('🔥 ¡BASTA! presionado - iniciando transición a votación');
         
-        // Enviar palabras y forzar fin de ronda
+        // Enviar palabras actuales
         submitWordsClassic();
         
         // Notificar al servidor que se terminó la ronda
@@ -243,10 +243,15 @@
           playerName: gameState.username 
         });
         
-        showNotification('¡Has terminado la ronda!', 'success');
+        showNotification('¡Ronda terminada! Redirigiendo a votación...', 'success');
         
         // Ocultar botón después de usar
         bastaButton.style.display = 'none';
+        
+        // Transición obligatoria a pantalla de votación
+        setTimeout(() => {
+          window.location.href = `/views/voting-screen.html?roomId=${gameState.roomId}`;
+        }, 1500);
       });
       
       // Botón rendirse
@@ -594,10 +599,15 @@
 
     function handleStartReview(data) {
       try {
-        console.log('🔄 [GAME.HTML] START_REVIEW recibido. Solicitando REVIEW_DATA...');
-        if (gameState?.roomId) {
-          socketManager.getRoomState({ roomId: gameState.roomId });
-        }
+        console.log('🔄 [GAME.HTML] START_REVIEW recibido. Redirigiendo a pantalla de votación...');
+        
+        // Transición obligatoria a la nueva pantalla de votación
+        showNotification('¡Iniciando fase de votación!', 'info');
+        
+        setTimeout(() => {
+          window.location.href = `/views/voting-screen.html?roomId=${gameState.roomId}`;
+        }, 1000);
+        
       } catch (e) {
         console.error('❌ [GAME.HTML] Error en handleStartReview:', e);
         showNotification('Error al iniciar la revisión', 'error');

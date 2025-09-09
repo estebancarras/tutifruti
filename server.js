@@ -1092,56 +1092,226 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handler personalizado para nuestro sistema de votación
-  socket.on('castVoteCustom', ({ roomId, playerName, category, isValid, voter }) => {
+  // Nuevo sistema de votación tipo "interruptores"
+  socket.on('requestVotingData', ({ roomId }) => {
     try {
-      console.log(`🗳️ [SERVER] Voto personalizado:`, { roomId, playerName, category, isValid, voter });
+      console.log(`📊 [SERVER] Solicitando datos de votación para sala: ${roomId}`);
       
       const gameState = gameStates[roomId];
-      if (!gameState || gameState.roundPhase !== 'review') {
-        return socket.emit('reviewError', { message: 'Revisión no disponible' });
+      if (!gameState) {
+        return socket.emit('votingError', { message: 'Sala no encontrada' });
       }
 
       const player = gameState.players.find(p => p.id === socket.id);
       if (!player) {
-        return socket.emit('reviewError', { message: 'Jugador no encontrado' });
+        return socket.emit('votingError', { message: 'Jugador no encontrado' });
+      }
+
+      // Preparar datos de votación
+      const votingData = {
+        roomId,
+        round: gameState.currentRound,
+        letter: gameState.currentLetter,
+        categories: gameState.categories,
+        words: {},
+        timeRemaining: 60,
+        totalPlayers: gameState.players.length
+      };
+
+      // Recopilar palabras de todos los jugadores
+      gameState.players.forEach(p => {
+        votingData.words[p.name] = {};
+        gameState.categories.forEach(category => {
+          const playerWords = gameState.words[p.name] || {};
+          votingData.words[p.name][category] = playerWords[category] || '';
+        });
+      });
+
+      socket.emit('votingData', votingData);
+      
+      logEvent({ socket, event: 'requestVotingData', roomId, message: `${player.name} solicitó datos de votación` });
+    } catch (error) {
+      console.error('[RequestVotingData] Error:', error);
+    }
+  });
+
+  socket.on('castVote', ({ roomId, targetPlayer, category, isValid, voter }) => {
+    try {
+      console.log(`🗳️ [SERVER] Voto tipo interruptor:`, { roomId, targetPlayer, category, isValid, voter });
+      
+      const gameState = gameStates[roomId];
+      if (!gameState || gameState.roundPhase !== 'review') {
+        return socket.emit('votingError', { message: 'Votación no disponible' });
+      }
+
+      const player = gameState.players.find(p => p.id === socket.id);
+      if (!player || player.name !== voter) {
+        return socket.emit('votingError', { message: 'Jugador no autorizado' });
       }
 
       // Prevenir auto-voto
-      if (playerName === player.name) {
-        return socket.emit('reviewError', { message: 'No puedes votar por tu propia palabra' });
+      if (targetPlayer === player.name) {
+        return socket.emit('votingError', { message: 'No puedes votar por tu propia palabra' });
       }
 
-      // Inicializar estructura si no existe
-      if (!gameState.customVotes) gameState.customVotes = {};
-      const wordKey = `${playerName}-${category}`;
-      if (!gameState.customVotes[wordKey]) {
-        gameState.customVotes[wordKey] = { valid: [], invalid: [] };
+      // Inicializar estructura de votación por interruptores
+      if (!gameState.switchVotes) gameState.switchVotes = {};
+      const wordKey = `${targetPlayer}-${category}`;
+      if (!gameState.switchVotes[wordKey]) {
+        gameState.switchVotes[wordKey] = {};
       }
 
-      // Remover voto anterior
-      gameState.customVotes[wordKey].valid = gameState.customVotes[wordKey].valid.filter(v => v !== player.name);
-      gameState.customVotes[wordKey].invalid = gameState.customVotes[wordKey].invalid.filter(v => v !== player.name);
-
-      // Agregar nuevo voto
-      gameState.customVotes[wordKey][isValid ? 'valid' : 'invalid'].push(player.name);
+      // Registrar voto (cada jugador tiene un "interruptor" por palabra)
+      gameState.switchVotes[wordKey][voter] = isValid;
 
       // Broadcast actualización
       io.to(roomId).emit('voteUpdate', {
-        wordId: wordKey,
-        playerName,
+        wordKey,
+        targetPlayer,
         category,
-        validCount: gameState.customVotes[wordKey].valid.length,
-        invalidCount: gameState.customVotes[wordKey].invalid.length,
-        voter: player.name,
+        voter,
         isValid
       });
 
-      logEvent({ socket, event: 'castVoteCustom', roomId, message: `${player.name} votó ${isValid ? 'válida' : 'inválida'} para ${playerName}/${category}` });
+      logEvent({ socket, event: 'castVote', roomId, message: `${voter} marcó como ${isValid ? 'válida' : 'inválida'} la palabra de ${targetPlayer}/${category}` });
     } catch (error) {
-      console.error('[CastVoteCustom] Error:', error);
+      console.error('[CastVote] Error:', error);
     }
   });
+
+  socket.on('validateVoting', ({ roomId, playerName, votes }) => {
+    try {
+      console.log(`✅ [SERVER] Validación de votación:`, { roomId, playerName });
+      
+      const gameState = gameStates[roomId];
+      if (!gameState) {
+        return socket.emit('votingError', { message: 'Sala no encontrada' });
+      }
+
+      const player = gameState.players.find(p => p.id === socket.id);
+      if (!player || player.name !== playerName) {
+        return socket.emit('votingError', { message: 'Jugador no autorizado' });
+      }
+
+      // Inicializar estructura de validaciones
+      if (!gameState.votingValidations) gameState.votingValidations = {};
+      gameState.votingValidations[playerName] = {
+        validated: true,
+        votes: votes,
+        timestamp: Date.now()
+      };
+
+      const validatedCount = Object.keys(gameState.votingValidations).length;
+      const totalPlayers = gameState.players.length;
+
+      // Broadcast progreso
+      io.to(roomId).emit('votingProgress', {
+        playersReady: validatedCount,
+        totalPlayers: totalPlayers
+      });
+
+      // Si todos han validado, completar votación
+      if (validatedCount >= totalPlayers) {
+        completeVoting(roomId);
+      }
+
+      logEvent({ socket, event: 'validateVoting', roomId, message: `${playerName} validó su votación (${validatedCount}/${totalPlayers})` });
+    } catch (error) {
+      console.error('[ValidateVoting] Error:', error);
+    }
+  });
+
+  // Función para completar la votación cuando todos han validado
+  function completeVoting(roomId) {
+    try {
+      console.log(`🏁 [SERVER] Completando votación para sala: ${roomId}`);
+      
+      const gameState = gameStates[roomId];
+      if (!gameState) return;
+
+      // Calcular resultados finales basados en el sistema de interruptores
+      const finalResults = {};
+      
+      gameState.players.forEach(player => {
+        finalResults[player.name] = {};
+        
+        gameState.categories.forEach(category => {
+          const word = gameState.words[player.name]?.[category] || '';
+          const wordKey = `${player.name}-${category}`;
+          
+          if (word) {
+            // Contar votos de invalidez
+            let invalidVotes = 0;
+            const totalVoters = gameState.players.length - 1; // Excluir al propio jugador
+            
+            if (gameState.switchVotes && gameState.switchVotes[wordKey]) {
+              Object.values(gameState.switchVotes[wordKey]).forEach(isValid => {
+                if (!isValid) invalidVotes++;
+              });
+            }
+            
+            // Una palabra es válida si la mayoría NO la marcó como inválida
+            const isValid = invalidVotes < (totalVoters / 2);
+            
+            finalResults[player.name][category] = {
+              word: word,
+              isValid: isValid,
+              invalidVotes: invalidVotes,
+              totalVoters: totalVoters
+            };
+          }
+        });
+      });
+
+      // Calcular puntajes
+      const scores = calculateScores(finalResults, gameState);
+      
+      // Actualizar estado del juego
+      gameState.roundPhase = 'completed';
+      gameState.lastRoundResults = finalResults;
+      gameState.scores = scores;
+
+      // Notificar a todos los clientes que la votación está completa
+      io.to(roomId).emit('votingComplete', {
+        results: finalResults,
+        scores: scores,
+        nextRound: gameState.currentRound + 1
+      });
+
+      // Limpiar datos de votación
+      gameState.votingValidations = {};
+      gameState.switchVotes = {};
+
+      logEvent({ roomId, event: 'votingComplete', message: `Votación completada para ronda ${gameState.currentRound}` });
+      
+    } catch (error) {
+      console.error('[CompleteVoting] Error:', error);
+    }
+  }
+
+  function calculateScores(results, gameState) {
+    const scores = {};
+    
+    gameState.players.forEach(player => {
+      let playerScore = 0;
+      const playerResults = results[player.name] || {};
+      
+      gameState.categories.forEach(category => {
+        const result = playerResults[category];
+        if (result && result.isValid && result.word) {
+          // Puntuación básica por palabra válida
+          playerScore += 10;
+          
+          // Bonificación por palabras únicas (implementar lógica si es necesario)
+          // Bonificación por palabras largas (implementar lógica si es necesario)
+        }
+      });
+      
+      scores[player.name] = playerScore;
+    });
+    
+    return scores;
+  }
 
   // Finalizar revisión - COMPATIBLE CON FRONTEND
   socket.on('finishReview', ({ roomId, votingResults }) => {
