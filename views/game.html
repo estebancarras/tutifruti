@@ -248,10 +248,7 @@
         // Ocultar botón después de usar
         bastaButton.style.display = 'none';
         
-        // Transición obligatoria a pantalla de votación
-        setTimeout(() => {
-          window.location.href = `/views/voting-screen.html?roomId=${gameState.roomId}`;
-        }, 1500);
+        // Ya no es necesaria la redirección aquí, el servidor la forzará con handleStartReview
       });
       
       // Botón rendirse
@@ -605,7 +602,7 @@
         showNotification('¡Iniciando fase de votación!', 'info');
         
         setTimeout(() => {
-          window.location.href = `/views/voting-screen.html?roomId=${gameState.roomId}`;
+          window.location.href = data.reviewUrl;
         }, 1000);
         
       } catch (e) {
