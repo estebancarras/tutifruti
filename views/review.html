@@ -225,8 +225,10 @@
         const timeLeftEl = document.getElementById('timeLeft');
 
         // 1. Pedir los datos para la votación al servidor
+
         socket.emit('requestVotingData', { roomId, playerName: username });
         console.log(`[VOTING] Pidiendo datos para la sala: ${roomId} como ${username}`);
+
 
         // 2. Escuchar los datos de votación del servidor
         socket.on('votingData', (data) => {
