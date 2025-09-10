@@ -1237,10 +1237,30 @@ io.on('connection', (socket) => {
       console.log(`🏁 [SERVER] Completando votación para sala: ${roomId}`);
       
       const gameState = gameStates[roomId];
-      if (!gameState) return;
+      if (!gameState || !gameState.votingValidations) return;
 
-      // Calcular resultados finales basados en el sistema de interruptores
+      // 1. Consolidar todos los votos en una estructura fácil de contar
+      const wordVoteCounts = {}; // { "player-category": { valid: 1, invalid: 3 } }
+
+      Object.values(gameState.votingValidations).forEach(validation => {
+        const playerVotes = validation.votes || {};
+        Object.entries(playerVotes).forEach(([wordKey, isValid]) => {
+          if (!wordVoteCounts[wordKey]) {
+            wordVoteCounts[wordKey] = { valid: 0, invalid: 0 };
+          }
+          if (isValid) {
+            wordVoteCounts[wordKey].valid++;
+          } else {
+            wordVoteCounts[wordKey].invalid++;
+          }
+        });
+      });
+
+      console.log('📊 [VOTING] Conteo de votos consolidado:', wordVoteCounts);
+
+      // 2. Calcular los resultados finales basados en los votos contados
       const finalResults = {};
+      const totalPlayers = gameState.players.length;
       
       gameState.players.forEach(player => {
         finalResults[player.name] = {};
@@ -1250,47 +1270,59 @@ io.on('connection', (socket) => {
           const wordKey = `${player.name}-${category}`;
           
           if (word) {
-            // Contar votos de invalidez
-            let invalidVotes = 0;
-            const totalVoters = gameState.players.length - 1; // Excluir al propio jugador
-            
-            if (gameState.switchVotes && gameState.switchVotes[wordKey]) {
-              Object.values(gameState.switchVotes[wordKey]).forEach(isValid => {
-                if (!isValid) invalidVotes++;
-              });
-            }
-            
-            // Una palabra es válida si la mayoría NO la marcó como inválida
-            const isValid = invalidVotes < (totalVoters / 2);
+            const votes = wordVoteCounts[wordKey] || { valid: 0, invalid: 0 };
+            const totalVoters = totalPlayers - 1; // No se cuenta el voto propio
+
+            // Una palabra es válida si MENOS de la mitad de los otros jugadores la marcan como inválida.
+            // Ejemplo: 5 jugadores -> 4 votantes. Es inválida con 2 o más votos "invalid".
+            const isValid = votes.invalid < (totalVoters / 2);
             
             finalResults[player.name][category] = {
               word: word,
               isValid: isValid,
-              invalidVotes: invalidVotes,
+              invalidVotes: votes.invalid,
+              validVotes: votes.valid,
+              totalVoters: totalVoters
+            };
+          } else {
+            finalResults[player.name][category] = {
+              word: '',
+              isValid: false,
+              invalidVotes: 0,
+              validVotes: 0,
               totalVoters: totalVoters
             };
           }
         });
       });
 
-      // Calcular puntajes
-      const scores = calculateScores(finalResults, gameState);
+      // 3. Calcular puntajes
+      const scores = calculateScoresFromResults(finalResults, gameState);
       
       // Actualizar estado del juego
       gameState.roundPhase = 'completed';
       gameState.lastRoundResults = finalResults;
-      gameState.scores = scores;
+      
+      // Acumular puntajes
+      Object.keys(scores).forEach(playerName => {
+        if (gameState.scores[playerName] !== undefined) {
+          gameState.scores[playerName] += scores[playerName].total;
+        } else {
+          gameState.scores[playerName] = scores[playerName].total;
+        }
+      });
 
-      // Notificar a todos los clientes que la votación está completa
+      // 4. Notificar a todos los clientes que la votación está completa
       io.to(roomId).emit('votingComplete', {
         results: finalResults,
-        scores: scores,
+        scores: gameState.scores, // Enviar puntajes acumulados
+        roundScores: scores, // Enviar puntajes de esta ronda
         nextRound: gameState.currentRound + 1
       });
 
-      // Limpiar datos de votación
+      // 5. Limpiar datos de votación para la siguiente ronda
       gameState.votingValidations = {};
-      gameState.switchVotes = {};
+      gameState.switchVotes = {}; // Limpiar también por si acaso
 
       logEvent({ roomId, event: 'votingComplete', message: `Votación completada para ronda ${gameState.currentRound}` });
       
@@ -1299,28 +1331,49 @@ io.on('connection', (socket) => {
     }
   }
 
-  function calculateScores(results, gameState) {
-    const scores = {};
-    
+  function calculateScoresFromResults(results, gameState) {
+    const roundScores = {};
+    const wordUniqueness = {}; // { category: { word: [player1, player2] } }
+
+    // Inicializar puntajes y contar unicidad de palabras
     gameState.players.forEach(player => {
-      let playerScore = 0;
-      const playerResults = results[player.name] || {};
-      
-      gameState.categories.forEach(category => {
-        const result = playerResults[category];
+      roundScores[player.name] = { total: 0 };
+    });
+
+    gameState.categories.forEach(category => {
+      wordUniqueness[category] = {};
+      gameState.players.forEach(player => {
+        const result = results[player.name]?.[category];
         if (result && result.isValid && result.word) {
-          // Puntuación básica por palabra válida
-          playerScore += 10;
-          
-          // Bonificación por palabras únicas (implementar lógica si es necesario)
-          // Bonificación por palabras largas (implementar lógica si es necesario)
+          const normalizedWord = result.word.toLowerCase().trim();
+          if (!wordUniqueness[category][normalizedWord]) {
+            wordUniqueness[category][normalizedWord] = [];
+          }
+          wordUniqueness[category][normalizedWord].push(player.name);
         }
       });
-      
-      scores[player.name] = playerScore;
+    });
+
+    // Asignar puntos
+    gameState.players.forEach(player => {
+      let totalPoints = 0;
+      gameState.categories.forEach(category => {
+        const result = results[player.name]?.[category];
+        if (result && result.isValid && result.word) {
+          const normalizedWord = result.word.toLowerCase().trim();
+          const uniquePlayers = wordUniqueness[category][normalizedWord];
+          
+          if (uniquePlayers.length === 1) {
+            totalPoints += 10; // Palabra única
+          } else {
+            totalPoints += 5; // Palabra repetida
+          }
+        }
+      });
+      roundScores[player.name].total = totalPoints;
     });
     
-    return scores;
+    return roundScores;
   }
 
   // Finalizar revisión - COMPATIBLE CON FRONTEND
