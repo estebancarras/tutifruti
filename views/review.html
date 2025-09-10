@@ -4,21 +4,175 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Votación - Tutifruti</title>
-    <link rel="stylesheet" href="/public/css/base.css">
-    <link rel="stylesheet" href="/public/css/components.css">
-    <link rel="stylesheet" href="/public/css/review.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #6a11cb;
+            --secondary-color: #2575fc;
+            --background-color: #f0f2f5;
+            --card-background: #ffffff;
+            --text-color: #333;
+            --light-text-color: #666;
+            --border-color: #e0e0e0;
+            --success-color: #4CAF50;
+            --error-color: #f44336;
+        }
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-color);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        .review-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--card-background);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .review-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+        }
+        .review-header h1 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .review-header p {
+            margin: 5px 0 0;
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .timer {
+            margin-top: 10px;
+            font-weight: 500;
+        }
+        .voting-area {
+            padding: 30px;
+        }
+        .category-section {
+            margin-bottom: 30px;
+        }
+        .category-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            border-bottom: 3px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .words-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        .word-card {
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .word-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+        }
+        .word-card.own-word {
+            background-color: #fff9e6;
+            border-color: #ffc107;
+        }
+        .word-card .player-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        .word-card .word-text {
+            font-size: 1.2rem;
+            font-weight: 500;
+            display: block;
+            margin: 10px 0;
+            min-height: 30px;
+        }
+        .review-controls {
+            padding: 20px 30px;
+            background: #f7f7f7;
+            text-align: center;
+            border-top: 1px solid var(--border-color);
+        }
+        .btn {
+            padding: 12px 30px;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 50px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .btn--primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        .btn--primary:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        .toggle-switch input {
+            height: 0;
+            width: 0;
+            visibility: hidden;
+        }
+        .toggle-switch label {
+            cursor: pointer;
+            text-indent: -9999px;
+            width: 50px;
+            height: 28px;
+            background: var(--error-color);
+            display: block;
+            border-radius: 100px;
+            position: relative;
+        }
+        .toggle-switch label:after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 22px;
+            height: 22px;
+            background: #fff;
+            border-radius: 90px;
+            transition: 0.3s;
+        }
+        .toggle-switch input:checked + label {
+            background: var(--success-color);
+        }
+        .toggle-switch input:checked + label:after {
+            left: calc(100% - 3px);
+            transform: translateX(-100%);
+        }
+    </style>
 </head>
 <body class="review-body">
     <div class="review-container">
         <header class="review-header">
-            <h1>Votación de la Ronda <span id="currentRound">1</span></h1>
-            <p>Letra: <span id="reviewLetter" class="review-letter">A</span></p>
-            <div id="timer" class="timer">Tiempo restante: <span id="timeLeft">60</span>s</div>
+            <h1>Votación de la Ronda <span id="currentRound">-</span></h1>
+            <p>Letra: <span id="reviewLetter" class="review-letter">-</span></p>
+            <div id="timer" class="timer">Tiempo restante: <span id="timeLeft">--</span>s</div>
         </header>
 
         <main class="voting-area" id="votingArea">
-            <!-- Las categorías y palabras se generarán aquí -->
+            <h2>Cargando palabras...</h2>
         </main>
 
         <footer class="review-controls">
@@ -30,16 +184,38 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script type="module">
-        // Importaciones y lógica principal de la votación
-        import { socketManager } from '/public/js/socket-manager.js';
-        import { uiManager } from '/public/js/ui-manager.js';
+        // Módulo de UI simple para notificaciones
+        const uiManager = {
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.textContent = message;
+                notification.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    padding: 15px 25px;
+                    border-radius: 8px;
+                    background-color: ${type === 'error' ? '#f44336' : type === 'success' ? '#4CAF50' : '#2196F3'};
+                    color: white;
+                    z-index: 1000;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                    font-family: 'Poppins', sans-serif;
+                `;
+                document.body.appendChild(notification);
+                setTimeout(() => notification.remove(), 3000);
+            }
+        };
 
+        // Lógica principal
         const roomId = localStorage.getItem('currentRoomId');
         const username = localStorage.getItem('username');
 
         if (!roomId || !username) {
+            alert('Error: No se encontró información de la sala o del jugador. Serás redirigido al inicio.');
             window.location.href = '/';
         }
+
+        const socket = io();
 
         // Elementos del DOM
         const votingArea = document.getElementById('votingArea');
@@ -48,12 +224,17 @@
         const letterEl = document.getElementById('reviewLetter');
         const timeLeftEl = document.getElementById('timeLeft');
 
-        // Pedir los datos para la votación al servidor
-        socketManager.emit('requestVotingData', { roomId });
+        // 1. Pedir los datos para la votación al servidor
+        socket.emit('requestVotingData', { roomId, playerName: username });
+        console.log(`[VOTING] Pidiendo datos para la sala: ${roomId} como ${username}`);
 
-        // Escuchar los datos de votación del servidor
-        socketManager.on('votingData', (data) => {
-            console.log('Datos de votación recibidos:', data);
+        // 2. Escuchar los datos de votación del servidor
+        socket.on('votingData', (data) => {
+            console.log('[VOTING] Datos de votación recibidos:', data);
+            if (!data || !data.categories || !data.words) {
+                votingArea.innerHTML = '<h2>Error: No se recibieron datos de votación válidos del servidor.</h2>';
+                return;
+            }
             roundEl.textContent = data.round;
             letterEl.textContent = data.letter;
             
@@ -62,6 +243,11 @@
 
         function renderVotingGrid(categories, playersWords) {
             votingArea.innerHTML = ''; // Limpiar área de votación
+
+            if (categories.length === 0) {
+                votingArea.innerHTML = '<h2>No hay categorías para mostrar.</h2>';
+                return;
+            }
 
             for (const category of categories) {
                 const categorySection = document.createElement('section');
@@ -75,33 +261,52 @@
                 const wordsContainer = document.createElement('div');
                 wordsContainer.className = 'words-container';
 
+                let wordsInCategory = 0;
                 for (const playerName in playersWords) {
-                    // No mostrar las palabras del propio jugador para votar
-                    if (playerName === username) {
-                        continue;
-                    }
+                    const word = playersWords[playerName][category];
+                    
+                    // Solo mostrar si hay palabra
+                    if (!word) continue;
+                    wordsInCategory++;
 
-                    const word = playersWords[playerName][category] || '---';
+                    const isOwnWord = playerName === username;
 
                     const wordCard = document.createElement('div');
                     wordCard.className = 'word-card';
+                    if (isOwnWord) {
+                        wordCard.classList.add('own-word');
+                    }
                     
+                    let toggleHTML = '';
+                    if (!isOwnWord) {
+                        toggleHTML = `
+                            <div class="toggle-switch">
+                                <span>Inválida</span>
+                                <input type="checkbox" id="toggle-${playerName}-${category}" class="vote-toggle" data-player="${playerName}" data-category="${category}" checked>
+                                <label for="toggle-${playerName}-${category}">Válida</label>
+                                <span>Válida</span>
+                            </div>
+                        `;
+                    } else {
+                        toggleHTML = `<p style="font-weight: 500; color: #888;">Tu palabra. Esperando votos...</p>`;
+                    }
+
                     wordCard.innerHTML = `
-                        <span class="word-text">${word}</span>
-                        <span class="player-name">(${playerName})</span>
-                        <label class="toggle-switch">
-                            <input type="checkbox" class="vote-toggle" data-player="${playerName}" data-category="${category}" checked>
-                            <span class="slider"></span>
-                        </label>
+                        <div class="player-name">${playerName} ${isOwnWord ? '(Tú)' : ''}</div>
+                        <div class="word-text">${word}</div>
+                        ${toggleHTML}
                     `;
                     wordsContainer.appendChild(wordCard);
                 }
-                categorySection.appendChild(wordsContainer);
-                votingArea.appendChild(categorySection);
+
+                if (wordsInCategory > 0) {
+                    categorySection.appendChild(wordsContainer);
+                    votingArea.appendChild(categorySection);
+                }
             }
         }
 
-        // Listener para el botón de confirmar
+        // 3. Listener para el botón de confirmar
         confirmBtn.addEventListener('click', () => {
             const votes = {};
             const toggles = document.querySelectorAll('.vote-toggle');
@@ -110,14 +315,13 @@
                 const targetPlayer = toggle.dataset.player;
                 const category = toggle.dataset.category;
                 const isValid = toggle.checked;
-                const wordKey = `${targetPlayer}-${category}`;
-                
-                // El voto se registra como la validez que el jugador le da
+                // La clave debe coincidir con la que espera el servidor
+                const wordKey = `${targetPlayer}-${category}`; 
                 votes[wordKey] = isValid;
             });
 
-            console.log('Enviando votos:', votes);
-            socketManager.emit('validateVoting', {
+            console.log('[VOTING] Enviando votos:', votes);
+            socket.emit('validateVoting', {
                 roomId,
                 playerName: username,
                 votes
@@ -125,17 +329,16 @@
 
             confirmBtn.disabled = true;
             confirmBtn.textContent = 'Esperando a los demás...';
-            uiManager.showNotification('Votos enviados. Esperando a los demás jugadores.', 'success');
+            uiManager.showNotification('Votos enviados. Esperando a los demás jugadores.', 'info');
         });
 
-        // Escuchar progreso de votación
-        socketManager.on('votingProgress', (data) => {
+        // 4. Escuchar progreso y finalización
+        socket.on('votingProgress', (data) => {
             confirmBtn.textContent = `Esperando a los demás... (${data.playersReady}/${data.totalPlayers})`;
         });
 
-        // Escuchar cuando la votación se completa
-        socketManager.on('votingComplete', (data) => {
-            console.log('Votación completa:', data);
+        socket.on('votingComplete', (data) => {
+            console.log('[VOTING] Votación completa, mostrando resultados:', data);
             // Guardar resultados para mostrarlos en la siguiente pantalla
             localStorage.setItem('lastRoundResults', JSON.stringify(data));
             // Redirigir a la pantalla de resultados
@@ -143,11 +346,15 @@
         });
 
         // Manejar errores
-        socketManager.on('votingError', (error) => {
-            console.error('Error de votación:', error.message);
+        socket.on('votingError', (error) => {
+            console.error('[VOTING] Error de votación:', error.message);
             uiManager.showNotification(error.message, 'error');
             confirmBtn.disabled = false;
             confirmBtn.textContent = 'Confirmar Votos';
+        });
+
+        socket.on('disconnect', () => {
+            uiManager.showNotification('Desconectado del servidor. Intenta recargar la página.', 'error');
         });
 
     </script>

@@ -957,101 +957,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Votar en revisión social - COMPATIBLE CON FRONTEND
-  socket.on('castVote', ({ roomId, playerName, category, isValid, voter }) => {
-    try {
-      console.log(`🗳️ [SERVER] Voto recibido:`, { roomId, playerName, category, isValid, voter });
-      
-      // Rate limiting
-      if (!checkRateLimit(socket, 'castVote', 1000)) {
-        logEvent({ socket, event: 'castVote', level: 'warn', message: 'Rate limit' });
-        return socket.emit('reviewError', { message: 'Demasiados votos. Espera un momento.' });
-      }
-
-      const gameState = gameStates[roomId];
-      if (!gameState || gameState.roundPhase !== 'review') {
-        return socket.emit('reviewError', { message: 'Revisión no disponible' });
-      }
-
-      const player = gameState.players.find(p => p.id === socket.id);
-      if (!player) {
-        return socket.emit('reviewError', { message: 'Jugador no encontrado' });
-      }
-
-      // Validaciones críticas
-      if (!playerName || !category || typeof isValid !== 'boolean') {
-        return socket.emit('reviewError', { message: 'Datos de voto inválidos' });
-      }
-
-      // PREVENIR AUTO-VOTO (doble verificación)
-      if (playerName === player.name || playerName === voter) {
-        logEvent({ socket, event: 'castVote', level: 'warn', message: `Intento de auto-voto bloqueado: ${player.name}` });
-        return socket.emit('reviewError', { message: 'No puedes votar por tu propia palabra' });
-      }
-
-      // Verificar que no sea su propia palabra
-      const [wordOwnerId] = wordId.split('-');
-      if (wordOwnerId === player.id) {
-        return socket.emit('reviewError', { message: 'No puedes votar tu propia palabra' });
-      }
-
-      // Inicializar estructura de votos si no existe
-      if (!gameState.reviewData.votes[wordId]) {
-        gameState.reviewData.votes[wordId] = {};
-      }
-
-      // Registrar o actualizar voto
-      gameState.reviewData.votes[wordId][player.id] = vote;
-
-      // Calcular estadísticas de la palabra
-      const wordStats = calculateWordVoteStats(gameState.reviewData.votes[wordId]);
-      
-      // Verificar si se alcanzó consenso
-      let consensus = null;
-      const totalVoters = gameState.players.length - 1; // Excluir al dueño de la palabra
-      const minVotesForConsensus = Math.max(2, Math.ceil(totalVoters * 0.5));
-      
-      if (wordStats.totalVotes >= minVotesForConsensus) {
-        const approvalRate = wordStats.approvals / wordStats.totalVotes;
-        const rejectionRate = wordStats.rejections / wordStats.totalVotes;
-        
-        if (approvalRate >= 0.6) {
-          consensus = 'approve';
-        } else if (rejectionRate >= 0.6) {
-          consensus = 'reject';
-        }
-      }
-
-      // Si hay consenso, marcarlo
-      if (consensus) {
-        gameState.reviewData.consensusReached[wordId] = consensus;
-      }
-
-      // Broadcast actualización de voto
-      io.to(roomId).emit('voteUpdate', {
-        wordId,
-        playerId: player.id,
-        vote,
-        wordStats,
-        consensus,
-        timestamp: Date.now()
-      });
-
-      // Verificar si todos han terminado de votar al jugador actual
-      const currentPlayer = gameState.players[gameState.reviewData.currentPlayerIndex];
-      if (currentPlayer && hasAllPlayersVotedForPlayer(gameState, currentPlayer.id)) {
-        // Avanzar al siguiente jugador automáticamente después de un delay
-        setTimeout(() => {
-          advanceToNextPlayer(roomId);
-        }, 2000);
-      }
-
-      logEvent({ socket, event: 'castVote', roomId, message: `${player.name} votó ${vote} en ${wordId}` });
-    } catch (error) {
-      console.error('[CastVote] Error:', error);
-      socket.emit('reviewError', { message: 'Error procesando voto' });
-    }
-  });
+  // El antiguo manejador de 'castVote' fue eliminado para evitar conflictos con el nuevo flujo de votación.
 
   // Saltar jugador actual (solo host)
   socket.on('skipCurrentPlayer', ({ roomId }) => {
@@ -1093,19 +999,25 @@ io.on('connection', (socket) => {
   });
 
   // Nuevo sistema de votación tipo "interruptores"
-  socket.on('requestVotingData', ({ roomId }) => {
+  socket.on('requestVotingData', ({ roomId, playerName }) => {
     try {
-      console.log(`📊 [SERVER] Solicitando datos de votación para sala: ${roomId}`);
+      console.log(`📊 [SERVER] Solicitando datos de votación para sala: ${roomId} por ${playerName}`);
       
       const gameState = gameStates[roomId];
       if (!gameState) {
         return socket.emit('votingError', { message: 'Sala no encontrada' });
       }
 
-      const player = gameState.players.find(p => p.id === socket.id);
-      if (!player) {
+      const playerIndex = gameState.players.findIndex(p => p.name === playerName);
+      if (playerIndex === -1) {
         return socket.emit('votingError', { message: 'Jugador no encontrado' });
       }
+
+      // Actualizar el socket.id del jugador para esta nueva conexión
+      gameState.players[playerIndex].id = socket.id;
+      socket.playerName = playerName; // Asociar nombre al socket actual
+      socket.roomId = roomId; // Asociar sala al socket actual
+      socket.join(roomId); // Unir el socket a la sala de la partida
 
       // Preparar datos de votación
       const votingData = {
@@ -1114,7 +1026,7 @@ io.on('connection', (socket) => {
         letter: gameState.currentLetter,
         categories: gameState.categories,
         words: {},
-        timeRemaining: 60,
+        timeRemaining: 60, // O tomarlo de gameState.reviewData.timeRemaining si existe
         totalPlayers: gameState.players.length
       };
 
@@ -1154,7 +1066,7 @@ io.on('connection', (socket) => {
         return socket.emit('votingError', { message: 'Votación no disponible' });
       }
 
-      const player = gameState.players.find(p => p.id === socket.id);
+      const player = gameState.players.find(p => p.name === socket.playerName);
       if (!player || player.name !== voter) {
         return socket.emit('votingError', { message: 'Jugador no autorizado' });
       }
