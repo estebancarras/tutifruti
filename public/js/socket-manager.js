@@ -78,6 +78,39 @@ class SocketManager {
       this.socket.emit('heartbeat_ack', { timestamp: data.timestamp });
     });
 
+    // Listener para mostrar resultados de la ronda
+    this.socket.on('show-round-results', (data) => {
+        console.log('Mostrando resultados de la ronda', data);
+        sessionStorage.setItem('roundResults', JSON.stringify(data));
+        window.location.href = data.resultsUrl;
+    });
+
+    // Listener para el progreso de 'siguiente ronda'
+    this.socket.on('next-round-progress', (data) => {
+        const nextRoundButton = document.getElementById('next-round-button');
+        if (nextRoundButton) {
+            nextRoundButton.textContent = `Listos ${data.readyCount}/${data.totalPlayers}...`;
+        }
+    });
+
+    // Listener para el inicio de la siguiente ronda
+    this.socket.on('next-round-starting', (data) => {
+        console.log('Iniciando siguiente ronda', data);
+        window.location.href = data.gameUrl;
+    });
+
+    // Listener para el final del juego
+    this.socket.on('game-ended', (data) => {
+        console.log('El juego ha terminado', data);
+        sessionStorage.setItem('finalResults', JSON.stringify(data));
+        // Opcional: redirigir a una página de resultados finales diferente
+        // Por ahora, reutilizamos la de resultados con una bandera
+        const resultsUrl = new URL(window.location.origin + '/views/results.html');
+        resultsUrl.searchParams.set('roomId', localStorage.getItem('currentRoomId'));
+        resultsUrl.searchParams.set('final', 'true');
+        window.location.href = resultsUrl.toString();
+    });
+
     // Listener genérico para depuración
     this.socket.onAny((event, ...args) => {
       console.log(`[SOCKET.IO INCOMING] Event: ${event}`, args);

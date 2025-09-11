@@ -1124,7 +1124,7 @@ io.on('connection', (socket) => {
       };
 
       const validatedCount = Object.keys(gameState.votingValidations).length;
-      const totalPlayers = gameState.players.length;
+      const totalPlayers = getConnectedPlayers(gameState).length;
 
       // Broadcast progreso
       io.to(roomId).emit('votingProgress', {
@@ -1132,7 +1132,7 @@ io.on('connection', (socket) => {
         totalPlayers: totalPlayers
       });
 
-      // Si todos han validado, completar votación
+      // Si todos los jugadores conectados han validado, completar votación
       if (validatedCount >= totalPlayers) {
         completeVoting(roomId);
       }
@@ -1143,7 +1143,34 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Función para completar la votación cuando todos han validado
+  // NUEVO: Manejador para cuando el jugador está listo para la siguiente ronda
+  socket.on('player-ready-for-next-round', () => {
+    const roomId = socket.roomId;
+    const playerName = socket.playerName;
+    const gameState = gameStates[roomId];
+
+    if (!gameState || gameState.roundPhase !== 'results' || !playerName) return;
+
+    if (!gameState.readyForNextRound) {
+      gameState.readyForNextRound = new Set();
+    }
+    gameState.readyForNextRound.add(playerName);
+
+    const connectedPlayers = getConnectedPlayers(gameState);
+    const allPlayersReady = connectedPlayers.every(p => gameState.readyForNextRound.has(p.name));
+
+    io.to(roomId).emit('next-round-progress', {
+        readyCount: gameState.readyForNextRound.size,
+        totalPlayers: connectedPlayers.length
+    });
+
+    if (allPlayersReady) {
+      startNextRound(roomId);
+    }
+  });
+
+
+  // MODIFICADO: completeVoting ahora lleva a la pantalla de resultados
   function completeVoting(roomId) {
     try {
       console.log(`🏁 [SERVER] Completando votación para sala: ${roomId}`);
@@ -1151,95 +1178,125 @@ io.on('connection', (socket) => {
       const gameState = gameStates[roomId];
       if (!gameState || !gameState.votingValidations) return;
 
-      // 1. Consolidar todos los votos en una estructura fácil de contar
-      const wordVoteCounts = {}; // { "player-category": { valid: 1, invalid: 3 } }
-
+      // 1. Consolidar votos
+      const wordVoteCounts = {}; 
       Object.values(gameState.votingValidations).forEach(validation => {
         const playerVotes = validation.votes || {};
         Object.entries(playerVotes).forEach(([wordKey, isValid]) => {
           if (!wordVoteCounts[wordKey]) {
             wordVoteCounts[wordKey] = { valid: 0, invalid: 0 };
           }
-          if (isValid) {
-            wordVoteCounts[wordKey].valid++;
-          } else {
-            wordVoteCounts[wordKey].invalid++;
-          }
+          if (isValid) wordVoteCounts[wordKey].valid++;
+          else wordVoteCounts[wordKey].invalid++;
         });
       });
 
-      console.log('📊 [VOTING] Conteo de votos consolidado:', wordVoteCounts);
-
-      // 2. Calcular los resultados finales basados en los votos contados
+      // 2. Calcular resultados finales de palabras
       const finalResults = {};
       const totalPlayers = gameState.players.length;
-      
       gameState.players.forEach(player => {
         finalResults[player.name] = {};
-        
         gameState.categories.forEach(category => {
           const word = gameState.words[player.name]?.[category] || '';
           const wordKey = `${player.name}-${category}`;
-          
           if (word) {
             const votes = wordVoteCounts[wordKey] || { valid: 0, invalid: 0 };
-            const totalVoters = totalPlayers - 1; // No se cuenta el voto propio
-
-            // Una palabra es válida si MENOS de la mitad de los otros jugadores la marcan como inválida.
-            // Ejemplo: 5 jugadores -> 4 votantes. Es inválida con 2 o más votos "invalid".
+            const totalVoters = totalPlayers - 1;
             const isValid = votes.invalid < (totalVoters / 2);
-            
-            finalResults[player.name][category] = {
-              word: word,
-              isValid: isValid,
-              invalidVotes: votes.invalid,
-              validVotes: votes.valid,
-              totalVoters: totalVoters
-            };
+            finalResults[player.name][category] = { word, isValid, invalidVotes: votes.invalid, validVotes: votes.valid };
           } else {
-            finalResults[player.name][category] = {
-              word: '',
-              isValid: false,
-              invalidVotes: 0,
-              validVotes: 0,
-              totalVoters: totalVoters
-            };
+            finalResults[player.name][category] = { word: '', isValid: false, invalidVotes: 0, validVotes: 0 };
           }
         });
       });
 
-      // 3. Calcular puntajes
-      const scores = calculateScoresFromResults(finalResults, gameState);
+      // 3. Calcular puntajes de la ronda
+      const roundScores = calculateScoresFromResults(finalResults, gameState);
       
-      // Actualizar estado del juego
-      gameState.roundPhase = 'completed';
-      gameState.lastRoundResults = finalResults;
-      
-      // Acumular puntajes
-      Object.keys(scores).forEach(playerName => {
-        if (gameState.scores[playerName] !== undefined) {
-          gameState.scores[playerName] += scores[playerName].total;
-        } else {
-          gameState.scores[playerName] = scores[playerName].total;
+      // 4. Acumular puntajes totales
+      Object.keys(roundScores).forEach(playerName => {
+        const playerObj = gameState.players.find(p => p.name === playerName);
+        if (playerObj) {
+            playerObj.score = (playerObj.score || 0) + roundScores[playerName].total;
         }
       });
 
-      // 4. Notificar a todos los clientes que la votación está completa
-      io.to(roomId).emit('votingComplete', {
-        results: finalResults,
-        scores: gameState.scores, // Enviar puntajes acumulados
-        roundScores: scores, // Enviar puntajes de esta ronda
-        nextRound: gameState.currentRound + 1
+      // 5. Crear el ranking
+      const ranking = [...gameState.players]
+        .sort((a, b) => b.score - a.score)
+        .map((p, index) => ({
+            rank: index + 1,
+            name: p.name,
+            score: p.score,
+            scoreChange: roundScores[p.name]?.total || 0
+        }));
+
+      // 6. Actualizar estado del juego a 'results'
+      gameState.roundPhase = 'results';
+      gameState.lastRoundResults = { finalResults, roundScores, ranking };
+      gameState.readyForNextRound = new Set(); // Limpiar para la nueva fase
+
+      // 7. Notificar a todos para que muestren la pantalla de resultados
+      io.to(roomId).emit('show-round-results', {
+        resultsUrl: `/views/results.html?roomId=${roomId}`,
+        round: gameState.currentRound,
+        ranking: ranking,
+        roundDetails: finalResults,
+        roundScores: roundScores
       });
 
-      // 5. Limpiar datos de votación para la siguiente ronda
-      gameState.votingValidations = {};
-      gameState.switchVotes = {}; // Limpiar también por si acaso
-
-      logEvent({ roomId, event: 'votingComplete', message: `Votación completada para ronda ${gameState.currentRound}` });
+      logEvent({ roomId, event: 'show-round-results', message: `Resultados de la ronda ${gameState.currentRound} enviados.` });
       
     } catch (error) {
       console.error('[CompleteVoting] Error:', error);
+      logEvent({ roomId, event: 'CompleteVoting', level: 'error', message: 'Error al completar la votación', error });
+    }
+  }
+
+  // NUEVA: Función para iniciar la siguiente ronda o finalizar el juego
+  function startNextRound(roomId) {
+    const gameState = gameStates[roomId];
+    if (!gameState) return;
+
+    // Limpiar datos de la ronda anterior
+    gameState.words = {};
+    gameState.validWords = {};
+    gameState.votes = {};
+    gameState.votingValidations = {};
+    gameState.switchVotes = {};
+    gameState.lastRoundResults = null;
+    gameState.readyForNextRound = new Set();
+
+    // Avanzar a la siguiente ronda
+    gameState.currentRound++;
+
+    if (gameState.currentRound > gameState.maxRounds) {
+      // Finalizar el juego
+      gameState.isPlaying = false;
+      gameState.roundPhase = 'ended';
+      const finalRanking = [...gameState.players]
+        .sort((a, b) => b.score - a.score)
+        .map((p, index) => ({ rank: index + 1, name: p.name, score: p.score }));
+        
+      io.to(roomId).emit('game-ended', { ranking: finalRanking });
+      logEvent({ roomId, event: 'game-ended', message: 'El juego ha finalizado.' });
+    } else {
+      // Iniciar la siguiente ronda
+      gameState.roundPhase = 'writing';
+      const letterData = generateLetterWithHistory(gameState);
+      
+      const roundPayload = {
+        letter: letterData.letter,
+        timeLimit: gameState.timeLimit,
+        round: gameState.currentRound,
+        categories: gameState.categories,
+        gameUrl: `/views/game.html?roomId=${roomId}`
+      };
+
+      io.to(roomId).emit('next-round-starting', roundPayload);
+      
+      setTimeout(() => startTimer(roomId), 500);
+      logEvent({ roomId, event: 'next-round-starting', message: `Iniciando ronda ${gameState.currentRound} con letra ${letterData.letter}` });
     }
   }
 
