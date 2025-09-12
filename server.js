@@ -1226,6 +1226,11 @@ io.on('connection', (socket) => {
       // CRÍTICO: Solo procesar si estamos en fase de votación
       if (gameState.roundPhase !== 'voting') {
         console.log(`❌ [ERROR] Intento de validación fuera de fase de votación. Fase actual: ${gameState.roundPhase}`);
+        // Si ya está en results, no es error - simplemente ignorar
+        if (gameState.roundPhase === 'results') {
+          console.log(`ℹ️ [INFO] Validación ignorada - ya en fase de resultados`);
+          return;
+        }
         return socket.emit('votingError', { message: 'La votación ya ha terminado.' });
       }
       
@@ -1241,8 +1246,19 @@ io.on('connection', (socket) => {
       // Solo avanzar si TODOS los jugadores originales han validado
       if (gameState.players.length > 0 && allOriginalPlayersValidated) {
         console.log(`✅ [SERVER] Todos los ${gameState.players.length} jugadores han validado. Completando votación.`);
+        
+        // Notificar estado de procesamiento antes de completar
+        io.to(roomId).emit('votingProcessing', {
+          message: 'Procesando resultados...',
+          allPlayersReady: true
+        });
+        
         logEvent({ roomId, event: 'validateVoting', message: `Todos los ${gameState.players.length} jugadores han validado. Completando votación.` });
-        completeVoting(roomId);
+        
+        // Pequeño delay para mostrar el mensaje de procesamiento
+        setTimeout(() => {
+          completeVoting(roomId);
+        }, 1000);
       } else {
         console.log(`⏳ [SERVER] Esperando más validaciones. ${validatedCount}/${gameState.players.length} completadas.`);
         // Notificar estado de espera a los jugadores que ya validaron

@@ -409,6 +409,14 @@
             window.location.href = data.resultsUrl;
         });
 
+        // Manejar estado de procesamiento
+        socket.on('votingProcessing', (data) => {
+            console.log('[VOTING] Procesando resultados:', data);
+            uiManager.showNotification(data.message, 'info');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Procesando...';
+        });
+
         // Manejar errores
         socket.on('votingError', (error) => {
             console.error('[VOTING] Error de votación:', error.message);
