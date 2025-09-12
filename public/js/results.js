@@ -43,15 +43,28 @@ document.addEventListener('DOMContentLoaded', () => {
         socketManager.emit('player-ready-for-next-round');
     });
 
-    // 5. Iniciar un contador simple
+    // 5. Iniciar contador con transición automática
     let timeLeft = 30;
     const timerInterval = setInterval(() => {
         timeLeft--;
         if (timerEl) {
             timerEl.textContent = timeLeft;
+            
+            // Cambiar color cuando quede poco tiempo
+            if (timeLeft <= 10) {
+                timerEl.parentElement.style.background = 'linear-gradient(45deg, #e74c3c, #c0392b)';
+                timerEl.parentElement.style.animation = 'pulse 1s infinite';
+            } else if (timeLeft <= 20) {
+                timerEl.parentElement.style.background = 'linear-gradient(45deg, #f39c12, #e67e22)';
+            }
         }
+        
         if (timeLeft <= 0) {
             clearInterval(timerInterval);
+            // Auto-avanzar si no se ha presionado el botón
+            if (!nextRoundButton.disabled) {
+                nextRoundButton.click();
+            }
         }
     }, 1000);
 
@@ -60,7 +73,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderRanking(ranking) {
         rankingListEl.innerHTML = ''; // Limpiar
-        ranking.forEach(player => {
+        
+        if (!ranking || ranking.length === 0) {
+            rankingListEl.innerHTML = '<p class="no-data">No hay datos de ranking disponibles</p>';
+            return;
+        }
+
+        ranking.forEach((player, index) => {
             const card = document.createElement('div');
             card.className = `player-card rank-${player.rank}`;
             
@@ -68,49 +87,84 @@ document.addEventListener('DOMContentLoaded', () => {
             if (player.rank === 1) trophy = '🏆';
             else if (player.rank === 2) trophy = '🥈';
             else if (player.rank === 3) trophy = '🥉';
+            else trophy = '🎯';
+
+            // Formatear cambio de puntaje
+            const scoreChange = player.scoreChange || 0;
+            const scoreChangeText = scoreChange > 0 ? `+${scoreChange}` : `${scoreChange}`;
+            const scoreChangeClass = scoreChange > 0 ? 'positive' : scoreChange < 0 ? 'negative' : 'neutral';
 
             card.innerHTML = `
-                <div class="rank">#${player.rank} ${trophy}</div>
+                <div class="rank">#${player.rank}</div>
+                <div class="trophy">${trophy}</div>
                 <div class="player-name">${escapeHTML(player.name)}</div>
-                <div class="score-change">+ ${player.scoreChange}</div>
-                <div class="player-score">${player.score} PTS</div>
+                <div class="score-change ${scoreChangeClass}">${scoreChangeText} pts</div>
+                <div class="player-score">${player.score || 0}</div>
             `;
+            
+            // Agregar delay de animación escalonado
+            card.style.animationDelay = `${0.1 + (index * 0.1)}s`;
+            
             rankingListEl.appendChild(card);
         });
     }
 
     function renderRoundDetails(details, ranking) {
         detailsContentEl.innerHTML = ''; // Limpiar
-        if (!ranking || ranking.length === 0 || !details) return;
+        
+        if (!ranking || ranking.length === 0 || !details) {
+            detailsContentEl.innerHTML = '<p class="no-data">No hay detalles de la ronda disponibles</p>';
+            return;
+        }
 
-        const categories = Object.keys(details[ranking[0].name]);
+        // Obtener categorías del primer jugador
+        const firstPlayerName = ranking[0].name;
+        const categories = Object.keys(details[firstPlayerName] || {});
 
-        categories.forEach(category => {
+        if (categories.length === 0) {
+            detailsContentEl.innerHTML = '<p class="no-data">No hay categorías para mostrar</p>';
+            return;
+        }
+
+        categories.forEach((category, categoryIndex) => {
             const categoryDiv = document.createElement('div');
             categoryDiv.className = 'category-results';
+            categoryDiv.style.animationDelay = `${0.8 + (categoryIndex * 0.1)}s`;
             
             let wordsHTML = '<div class="word-grid">';
+            let hasWords = false;
+            
             ranking.forEach(player => {
                 const playerName = player.name;
                 const result = details[playerName]?.[category];
-                if (!result) return;
-
-                const statusClass = result.isValid ? 'valid' : 'invalid';
-                // La lógica de puntos se mantiene en el cliente porque el servidor no la provee por palabra.
-                const points = result.isValid ? (isWordUnique(details, category, result.word) ? 10 : 5) : 0;
+                
+                // Mostrar todas las entradas, incluso si no hay palabra
+                const word = result?.word || '';
+                const isValid = result?.isValid || false;
+                const statusClass = word ? (isValid ? 'valid' : 'invalid') : 'empty';
+                
+                // Calcular puntos
+                let points = 0;
+                if (word && isValid) {
+                    points = isWordUnique(details, category, word) ? 10 : 5;
+                }
 
                 wordsHTML += `
                     <div class="word-item ${statusClass}">
                         <div class="word-player">${escapeHTML(playerName)}</div>
-                        <div class="word-text">${escapeHTML(result.word) || '—'}</div>
-                        <div class="word-points">${points} pts</div>
+                        <div class="word-text">${escapeHTML(word) || '(sin palabra)'}</div>
+                        <div class="word-points">${points}</div>
                     </div>
                 `;
+                hasWords = true;
             });
+            
             wordsHTML += '</div>';
 
-            categoryDiv.innerHTML = `<h3>${escapeHTML(category)}</h3>${wordsHTML}`;
-            detailsContentEl.appendChild(categoryDiv);
+            if (hasWords) {
+                categoryDiv.innerHTML = `<h3>${escapeHTML(category)}</h3>${wordsHTML}`;
+                detailsContentEl.appendChild(categoryDiv);
+            }
         });
     }
     
