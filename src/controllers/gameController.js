@@ -145,23 +145,36 @@ function processAndSendResults(io, roomId) {
     }
   }
 
-  // 3. Actualizar puntajes totales de los jugadores
-  room.players.forEach(player => {
+  // 3. Actualizar puntajes y preparar datos para el ranking
+  const rankingData = room.players.map(player => {
+    const roundScore = roundScores[player.name]?.total || 0;
     if (!player.score) player.score = 0;
-    if (roundScores[player.name]) {
-      player.score += roundScores[player.name].total;
-    }
+    
+    // Actualizar el puntaje total del jugador en el estado de la sala
+    player.score += roundScore;
+
+    return {
+      name: player.name,
+      score: player.score, // Puntaje total acumulado
+      scoreChange: roundScore, // Puntaje de esta ronda
+    };
   });
 
-  // Ordenar jugadores por puntaje para el ranking
-  const rankedPlayers = [...room.players].sort((a, b) => b.score - a.score);
+  // Ordenar jugadores por puntaje total para asignar el ranking
+  rankingData.sort((a, b) => b.score - a.score);
+
+  // Asignar el rango (rank)
+  const rankedPlayers = rankingData.map((player, index) => ({
+    ...player,
+    rank: index + 1,
+  }));
 
   // 4. Preparar y enviar el paquete de resultados
   const resultsData = {
     round: room.state.round,
     letter: room.state.letter,
-    scores: roundScores, // Puntajes de la ronda
-    ranking: rankedPlayers, // Ranking actualizado
+    scores: roundScores, // Mantenemos los detalles de la ronda para la vista de detalles
+    ranking: rankedPlayers, // Ranking con puntaje total, de ronda y rango
     resultsUrl: `/views/results.html?roomId=${roomId}`
   };
 

@@ -1332,22 +1332,25 @@ io.on('connection', (socket) => {
       // 3. Calcular puntajes de la ronda
       const roundScores = calculateScoresFromResults(finalResults, gameState);
       
-      // 4. Acumular puntajes totales
-      Object.keys(roundScores).forEach(playerName => {
-        const playerObj = gameState.players.find(p => p.name === playerName);
-        if (playerObj) {
-            playerObj.score = (playerObj.score || 0) + roundScores[playerName].total;
-        }
-      });
+      // 4. Acumular puntajes y crear el ranking
+      const ranking = gameState.players
+        .map(player => {
+          const roundScore = roundScores[player.name]?.total || 0;
+          
+          // Acumular el puntaje directamente en el objeto del jugador
+          player.score = (player.score || 0) + roundScore;
 
-      // 5. Crear el ranking
-      const ranking = [...gameState.players]
-        .sort((a, b) => b.score - a.score)
-        .map((p, index) => ({
-            rank: index + 1,
-            name: p.name,
-            score: p.score,
-            scoreChange: roundScores[p.name]?.total || 0
+          // Retornar los datos para el ranking
+          return {
+            name: player.name,
+            score: player.score, // Puntaje total acumulado
+            scoreChange: roundScore, // Puntaje de esta ronda
+          };
+        })
+        .sort((a, b) => b.score - a.score) // Ordenar por puntaje total
+        .map((player, index) => ({ // Asignar el rango
+          ...player,
+          rank: index + 1,
         }));
 
       // 6. Actualizar estado del juego a 'results'

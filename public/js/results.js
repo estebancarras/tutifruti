@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderRanking(resultsData.ranking);
 
     // 3. Renderizar el detalle de la ronda
-    renderRoundDetails(resultsData.roundDetails, resultsData.ranking);
+    renderRoundDetails(resultsData.scores, resultsData.ranking);
 
     // 4. Configurar botón de siguiente ronda
     nextRoundButton.disabled = false;
@@ -109,17 +109,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function renderRoundDetails(details, ranking) {
+    function renderRoundDetails(scores, ranking) {
         detailsContentEl.innerHTML = ''; // Limpiar
         
-        if (!ranking || ranking.length === 0 || !details) {
+        if (!ranking || ranking.length === 0 || !scores) {
             detailsContentEl.innerHTML = '<p class="no-data">No hay detalles de la ronda disponibles</p>';
             return;
         }
 
-        // Obtener categorías del primer jugador
+        // Obtener categorías del primer jugador que tenga detalles
         const firstPlayerName = ranking[0].name;
-        const categories = Object.keys(details[firstPlayerName] || {});
+        const categories = Object.keys(scores[firstPlayerName]?.details || {});
 
         if (categories.length === 0) {
             detailsContentEl.innerHTML = '<p class="no-data">No hay categorías para mostrar</p>';
@@ -132,39 +132,29 @@ document.addEventListener('DOMContentLoaded', () => {
             categoryDiv.style.animationDelay = `${0.8 + (categoryIndex * 0.1)}s`;
             
             let wordsHTML = '<div class="word-grid">';
-            let hasWords = false;
             
             ranking.forEach(player => {
                 const playerName = player.name;
-                const result = details[playerName]?.[category];
+                const result = scores[playerName]?.details?.[category];
                 
-                // Mostrar todas las entradas, incluso si no hay palabra
                 const word = result?.word || '';
-                const isValid = result?.isValid || false;
+                const points = result?.score || 0;
+                const isValid = points > 0;
                 const statusClass = word ? (isValid ? 'valid' : 'invalid') : 'empty';
                 
-                // Calcular puntos
-                let points = 0;
-                if (word && isValid) {
-                    points = isWordUnique(details, category, word) ? 10 : 5;
-                }
-
                 wordsHTML += `
                     <div class="word-item ${statusClass}">
                         <div class="word-player">${escapeHTML(playerName)}</div>
-                        <div class="word-text">${escapeHTML(word) || '(sin palabra)'}</div>
+                        <div class="word-text" title="${escapeHTML(result?.reason || '')}">${escapeHTML(word) || '(sin palabra)'}</div>
                         <div class="word-points">${points}</div>
                     </div>
                 `;
-                hasWords = true;
             });
             
             wordsHTML += '</div>';
 
-            if (hasWords) {
-                categoryDiv.innerHTML = `<h3>${escapeHTML(category)}</h3>${wordsHTML}`;
-                detailsContentEl.appendChild(categoryDiv);
-            }
+            categoryDiv.innerHTML = `<h3>${escapeHTML(category)}</h3>${wordsHTML}`;
+            detailsContentEl.appendChild(categoryDiv);
         });
     }
     
@@ -181,18 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         nextRoundButton.addEventListener('click', () => window.location.href = '/');
 
         renderRanking(finalData.ranking);
-    }
-
-    function isWordUnique(details, category, word) {
-        if (!word) return false;
-        let count = 0;
-        for (const playerName in details) {
-            const result = details[playerName][category];
-            if (result.isValid && result.word.toLowerCase().trim() === word.toLowerCase().trim()) {
-                count++;
-            }
-        }
-        return count === 1;
     }
 
     function escapeHTML(str) {
