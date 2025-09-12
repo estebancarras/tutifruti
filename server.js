@@ -926,10 +926,11 @@ io.on('connection', (socket) => {
       nextPhase: 'voting'
     });
     
+    // PROBLEMA IDENTIFICADO: Esta línea estaba cambiando la fase incorrectamente
     // Preparar siguiente ronda o finalizar
     gameState.words = {};
     gameState.votes = {};
-    gameState.roundPhase = 'results';
+    // NO cambiar roundPhase aquí - ya se estableció como 'voting' arriba
     gameState.currentRound++;
     gameState.timeRemaining = gameState.timeLimit;
     gameState.timerEndsAt = null;
@@ -1204,9 +1205,9 @@ io.on('connection', (socket) => {
 
       const connectedPlayers = getConnectedPlayers(gameState);
       const validatedCount = Object.keys(gameState.votingValidations).length;
-      const totalPlayers = connectedPlayers.length;
+      const totalPlayers = gameState.players.length; // CORREGIDO: Usar jugadores originales, no conectados
 
-      logEvent({ socket, event: 'validateVoting', roomId, message: `${playerName} validó su votación (${validatedCount}/${totalPlayers})` });
+      logEvent({ socket, event: 'validateVoting', roomId, message: `${playerName} validó su votación (${validatedCount}/${totalPlayers} jugadores originales)` });
 
       // Notificar a todos del progreso con información correcta
       io.to(roomId).emit('votingProgress', {
@@ -1215,16 +1216,35 @@ io.on('connection', (socket) => {
         pendingPlayers: gameState.players.filter(p => !gameState.votingValidations[p.name]).map(p => p.name)
       });
 
+      // DEBUG: Verificar estado de la fase antes de procesar
+      console.log(`🔍 [DEBUG] Estado actual de la sala ${roomId}:`);
+      console.log(`   - Fase actual: ${gameState.roundPhase}`);
+      console.log(`   - Jugadores originales: ${gameState.players.map(p => p.name).join(', ')}`);
+      console.log(`   - Validaciones actuales: ${Object.keys(gameState.votingValidations).join(', ')}`);
+      console.log(`   - Validados: ${validatedCount}/${gameState.players.length}`);
+      
+      // CRÍTICO: Solo procesar si estamos en fase de votación
+      if (gameState.roundPhase !== 'voting') {
+        console.log(`❌ [ERROR] Intento de validación fuera de fase de votación. Fase actual: ${gameState.roundPhase}`);
+        return socket.emit('votingError', { message: 'La votación ya ha terminado.' });
+      }
+      
       // CORREGIDO: Solo completar votación cuando TODOS los jugadores originales hayan validado
-      // No solo los conectados, sino todos los que iniciaron la ronda
-      const allOriginalPlayersValidated = gameState.players.every(p => gameState.votingValidations[p.name]);
-      const allConnectedPlayersValidated = connectedPlayers.every(p => gameState.votingValidations[p.name]);
+      const allOriginalPlayersValidated = gameState.players.every(p => {
+        const hasValidated = gameState.votingValidations[p.name];
+        console.log(`   - ${p.name}: ${hasValidated ? 'VALIDADO' : 'PENDIENTE'}`);
+        return hasValidated;
+      });
 
-      // Solo avanzar si TODOS los jugadores originales han validado O si se agotó el tiempo
+      console.log(`🔍 [DEBUG] ¿Todos validaron? ${allOriginalPlayersValidated}`);
+
+      // Solo avanzar si TODOS los jugadores originales han validado
       if (gameState.players.length > 0 && allOriginalPlayersValidated) {
+        console.log(`✅ [SERVER] Todos los ${gameState.players.length} jugadores han validado. Completando votación.`);
         logEvent({ roomId, event: 'validateVoting', message: `Todos los ${gameState.players.length} jugadores han validado. Completando votación.` });
         completeVoting(roomId);
       } else {
+        console.log(`⏳ [SERVER] Esperando más validaciones. ${validatedCount}/${gameState.players.length} completadas.`);
         // Notificar estado de espera a los jugadores que ya validaron
         const waitingPlayers = gameState.players.filter(p => gameState.votingValidations[p.name]);
         waitingPlayers.forEach(player => {
