@@ -171,7 +171,24 @@ function logEvent({ socket, event, roomId = null, level = 'info', message = '', 
   console.log(JSON.stringify(payload));
 }
 
-// Servir archivos estáticos (orden importante)
+// Servir archivos estáticos con configuración mejorada para producción
+app.use('/css', express.static(__dirname + '/public/css', {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    }
+  }
+}));
+
+app.use('/js', express.static(__dirname + '/public/js', {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.js')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+  }
+}));
+
+app.use('/assets', express.static(__dirname + '/public/assets'));
 app.use('/public', express.static(__dirname + '/public'));
 app.use('/utils', express.static(__dirname + '/utils'));
 app.use('/views', express.static(__dirname + '/views'));
@@ -186,6 +203,25 @@ app.get('/health', (req, res) => {
     memory: process.memoryUsage(),
     socketConnections: io.engine.clientsCount
   });
+});
+
+// Debug endpoint para verificar archivos estáticos
+app.get('/debug/files', (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  
+  try {
+    const publicFiles = fs.readdirSync(path.join(__dirname, 'public'), { recursive: true });
+    const viewFiles = fs.readdirSync(path.join(__dirname, 'views'));
+    
+    res.json({
+      publicFiles: publicFiles,
+      viewFiles: viewFiles,
+      __dirname: __dirname
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Socket.IO status endpoint
