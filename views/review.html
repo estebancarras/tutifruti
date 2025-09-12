@@ -336,15 +336,16 @@
 
         // 4. Escuchar progreso y finalización
         socket.on('votingProgress', (data) => {
-            confirmBtn.textContent = `Esperando a los demás... (${data.playersReady}/${data.totalPlayers})`;
+            confirmBtn.textContent = `Validando... (${data.playersReady}/${data.totalPlayers})`;
         });
 
-        socket.on('votingComplete', (data) => {
-            console.log('[VOTING] Votación completa, mostrando resultados:', data);
-            // Guardar resultados para mostrarlos en la siguiente pantalla
-            localStorage.setItem('lastRoundResults', JSON.stringify(data));
-            // Redirigir a la pantalla de resultados
-            window.location.href = '/views/results.html';
+        // CORREGIDO: Escuchar el evento correcto que definimos en el backend
+        socket.on('show-round-results', (data) => {
+            console.log('[VOTING] Votación completa, redirigiendo a resultados:', data);
+            // Usar sessionStorage como en el resto de la nueva implementación
+            sessionStorage.setItem('roundResults', JSON.stringify(data));
+            // Redirigir a la URL que nos da el servidor
+            window.location.href = data.resultsUrl;
         });
 
         // Manejar errores

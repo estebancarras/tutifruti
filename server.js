@@ -1103,43 +1103,63 @@ io.on('connection', (socket) => {
 
   socket.on('validateVoting', ({ roomId, playerName, votes }) => {
     try {
-      console.log(`✅ [SERVER] Validación de votación:`, { roomId, playerName });
-      
       const gameState = gameStates[roomId];
       if (!gameState) {
         return socket.emit('votingError', { message: 'Sala no encontrada' });
       }
 
-      const player = gameState.players.find(p => p.id === socket.id);
-      if (!player || player.name !== playerName) {
-        return socket.emit('votingError', { message: 'Jugador no autorizado' });
+      // Autorizar por nombre de jugador, es más robusto que el socket.id
+      const player = gameState.players.find(p => p.name === playerName);
+      if (!player) {
+        return socket.emit('votingError', { message: 'Jugador no encontrado en la sala.' });
+      }
+      
+      // Salvaguarda: Actualizar el socket.id y estado de conexión del jugador
+      player.id = socket.id;
+      player.connected = true;
+      socket.playerName = playerName;
+      socket.roomId = roomId;
+      if(!socket.rooms.has(roomId)) {
+        socket.join(roomId);
       }
 
-      // Inicializar estructura de validaciones
       if (!gameState.votingValidations) gameState.votingValidations = {};
+      
+      // Si el jugador ya validó, no hacer nada para evitar procesamientos duplicados
+      if (gameState.votingValidations[playerName]) {
+          logEvent({ socket, event: 'validateVoting', roomId, level: 'warn', message: `${playerName} intentó validar de nuevo.` });
+          return;
+      }
+
       gameState.votingValidations[playerName] = {
         validated: true,
         votes: votes,
         timestamp: Date.now()
       };
 
+      const connectedPlayers = getConnectedPlayers(gameState);
       const validatedCount = Object.keys(gameState.votingValidations).length;
-      const totalPlayers = getConnectedPlayers(gameState).length;
+      const totalPlayers = connectedPlayers.length;
 
-      // Broadcast progreso
+      logEvent({ socket, event: 'validateVoting', roomId, message: `${playerName} validó su votación (${validatedCount}/${totalPlayers})` });
+
+      // Notificar a todos del progreso
       io.to(roomId).emit('votingProgress', {
         playersReady: validatedCount,
         totalPlayers: totalPlayers
       });
 
-      // Si todos los jugadores conectados han validado, completar votación
-      if (validatedCount >= totalPlayers) {
+      // Condición de finalización: todos los jugadores *actualmente conectados* deben haber validado.
+      const allConnectedPlayersValidated = connectedPlayers.every(p => gameState.votingValidations[p.name]);
+
+      if (totalPlayers > 0 && allConnectedPlayersValidated) {
+        logEvent({ roomId, event: 'validateVoting', message: `Todos los ${totalPlayers} jugadores conectados han validado. Completando votación.` });
         completeVoting(roomId);
       }
-
-      logEvent({ socket, event: 'validateVoting', roomId, message: `${playerName} validó su votación (${validatedCount}/${totalPlayers})` });
+      
     } catch (error) {
       console.error('[ValidateVoting] Error:', error);
+      logEvent({ socket, event: 'validateVoting', roomId, level: 'error', message: 'Error al procesar la validación de votos', error });
     }
   });
 
