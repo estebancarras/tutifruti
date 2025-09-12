@@ -336,8 +336,69 @@
 
         // 4. Escuchar progreso y finalización
         socket.on('votingProgress', (data) => {
-            confirmBtn.textContent = `Validando... (${data.playersReady}/${data.totalPlayers})`;
+            updateVotingProgress(data);
         });
+
+        socket.on('votingWaiting', (data) => {
+            showWaitingState(data);
+        });
+
+        function updateVotingProgress(data) {
+            const { playersReady, totalPlayers, pendingPlayers } = data;
+            confirmBtn.textContent = `Validando... (${playersReady}/${totalPlayers})`;
+            
+            if (pendingPlayers && pendingPlayers.length > 0) {
+                uiManager.showNotification(
+                    `Esperando a: ${pendingPlayers.join(', ')}`, 
+                    'info'
+                );
+            }
+        }
+
+        function showWaitingState(data) {
+            const { message, playersReady, totalPlayers, pendingPlayers } = data;
+            
+            // Actualizar botón con estado de espera
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = `${message} (${playersReady}/${totalPlayers})`;
+            
+            // Mostrar notificación con jugadores pendientes
+            if (pendingPlayers && pendingPlayers.length > 0) {
+                uiManager.showNotification(
+                    `Esperando a: ${pendingPlayers.join(', ')}`, 
+                    'info'
+                );
+            }
+            
+            // Agregar indicador visual en la UI
+            let waitingIndicator = document.getElementById('waiting-indicator');
+            if (!waitingIndicator) {
+                waitingIndicator = document.createElement('div');
+                waitingIndicator.id = 'waiting-indicator';
+                waitingIndicator.style.cssText = `
+                    background: linear-gradient(45deg, #ff9800, #f57c00);
+                    color: white;
+                    padding: 15px;
+                    text-align: center;
+                    font-weight: 600;
+                    border-radius: 8px;
+                    margin: 20px 0;
+                    animation: pulse 2s infinite;
+                `;
+                document.querySelector('.review-controls').prepend(waitingIndicator);
+            }
+            
+            waitingIndicator.innerHTML = `
+                <div>✋ ${message}</div>
+                <div style="font-size: 0.9em; margin-top: 5px;">
+                    Progreso: ${playersReady}/${totalPlayers} jugadores
+                </div>
+                ${pendingPlayers && pendingPlayers.length > 0 ? 
+                    `<div style="font-size: 0.8em; margin-top: 5px;">Falta: ${pendingPlayers.join(', ')}</div>` : 
+                    ''
+                }
+            `;
+        }
 
         // CORREGIDO: Escuchar el evento correcto que definimos en el backend
         socket.on('show-round-results', (data) => {

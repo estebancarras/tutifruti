@@ -888,13 +888,42 @@ io.on('connection', (socket) => {
       if (idx !== -1) gameState.players[idx].score += scores[name].total;
     });
     
-    // Notificar fin de ronda (resultados)
+    // CORREGIDO: Iniciar fase de votación en lugar de mostrar resultados directamente
+    gameState.roundPhase = 'voting';
+    gameState.votingValidations = {}; // Limpiar validaciones anteriores
+    
+    // Iniciar timer de votación (60 segundos)
+    if (gameState.votingTimer) {
+      clearTimeout(gameState.votingTimer);
+    }
+    
+    gameState.votingTimer = setTimeout(() => {
+      console.log(`⏰ [SERVER] Tiempo de votación agotado para sala: ${roomId}`);
+      logEvent({ roomId, event: 'votingTimeout', message: 'Tiempo de votación agotado, completando con votos actuales' });
+      
+      // Auto-validar jugadores que no validaron
+      gameState.players.forEach(player => {
+        if (!gameState.votingValidations[player.name]) {
+          gameState.votingValidations[player.name] = {
+            validated: true,
+            votes: {}, // Sin votos = todas las palabras válidas por defecto
+            timestamp: Date.now(),
+            autoValidated: true
+          };
+        }
+      });
+      
+      completeVoting(roomId);
+    }, 60000);
+    
+    // Notificar transición a votación
     io.to(roomId).emit('roundEnded', {
       scores,
       words: gameState.words,
       validWords: gameState.validWords,
       playerScores: gameState.players.map(p => ({ name: p.name, score: p.score })),
-      letter: gameState.currentLetter
+      letter: gameState.currentLetter,
+      nextPhase: 'voting'
     });
     
     // Preparar siguiente ronda o finalizar
@@ -1179,18 +1208,36 @@ io.on('connection', (socket) => {
 
       logEvent({ socket, event: 'validateVoting', roomId, message: `${playerName} validó su votación (${validatedCount}/${totalPlayers})` });
 
-      // Notificar a todos del progreso
+      // Notificar a todos del progreso con información correcta
       io.to(roomId).emit('votingProgress', {
         playersReady: validatedCount,
-        totalPlayers: totalPlayers
+        totalPlayers: gameState.players.length,
+        pendingPlayers: gameState.players.filter(p => !gameState.votingValidations[p.name]).map(p => p.name)
       });
 
-      // Condición de finalización: todos los jugadores *actualmente conectados* deben haber validado.
+      // CORREGIDO: Solo completar votación cuando TODOS los jugadores originales hayan validado
+      // No solo los conectados, sino todos los que iniciaron la ronda
+      const allOriginalPlayersValidated = gameState.players.every(p => gameState.votingValidations[p.name]);
       const allConnectedPlayersValidated = connectedPlayers.every(p => gameState.votingValidations[p.name]);
 
-      if (totalPlayers > 0 && allConnectedPlayersValidated) {
-        logEvent({ roomId, event: 'validateVoting', message: `Todos los ${totalPlayers} jugadores conectados han validado. Completando votación.` });
+      // Solo avanzar si TODOS los jugadores originales han validado O si se agotó el tiempo
+      if (gameState.players.length > 0 && allOriginalPlayersValidated) {
+        logEvent({ roomId, event: 'validateVoting', message: `Todos los ${gameState.players.length} jugadores han validado. Completando votación.` });
         completeVoting(roomId);
+      } else {
+        // Notificar estado de espera a los jugadores que ya validaron
+        const waitingPlayers = gameState.players.filter(p => gameState.votingValidations[p.name]);
+        waitingPlayers.forEach(player => {
+          const playerSocket = [...io.sockets.sockets.values()].find(s => s.playerName === player.name);
+          if (playerSocket) {
+            playerSocket.emit('votingWaiting', {
+              message: 'Esperando a los demás jugadores...',
+              playersReady: validatedCount,
+              totalPlayers: gameState.players.length,
+              pendingPlayers: gameState.players.filter(p => !gameState.votingValidations[p.name]).map(p => p.name)
+            });
+          }
+        });
       }
       
     } catch (error) {
@@ -1292,7 +1339,13 @@ io.on('connection', (socket) => {
       gameState.lastRoundResults = { finalResults, roundScores, ranking };
       gameState.readyForNextRound = new Set(); // Limpiar para la nueva fase
 
-      // 7. Notificar a todos para que muestren la pantalla de resultados
+      // 7. Limpiar timer de votación si existe (ya completamos)
+      if (gameState.votingTimer) {
+        clearTimeout(gameState.votingTimer);
+        gameState.votingTimer = null;
+      }
+
+      // 8. Notificar a todos para que muestren la pantalla de resultados
       io.to(roomId).emit('show-round-results', {
         resultsUrl: `/views/results.html?roomId=${roomId}`,
         round: gameState.currentRound,
