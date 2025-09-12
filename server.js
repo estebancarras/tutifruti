@@ -1189,6 +1189,18 @@ io.on('connection', (socket) => {
         socket.join(roomId);
       }
 
+      // CRÍTICO: Corregir la comprobación de fase. La votación ocurre durante la fase 'review'.
+      if (gameState.roundPhase !== 'review') {
+        // Si la votación ya se completó y estamos en resultados, es una petición tardía. Ignorarla.
+        if (gameState.roundPhase === 'results') {
+          logEvent({ socket, event: 'validateVoting', roomId, level: 'info', message: `Validación tardía de ${playerName} ignorada (fase de resultados).` });
+          return;
+        }
+        // Si la fase no es ni 'review' ni 'results', es un error de flujo.
+        logEvent({ socket, event: 'validateVoting', roomId, level: 'error', message: `Intento de validación en fase incorrecta: ${gameState.roundPhase}` });
+        return socket.emit('votingError', { message: 'No es momento de votar.' });
+      }
+
       if (!gameState.votingValidations) gameState.votingValidations = {};
       
       // Si el jugador ya validó, no hacer nada para evitar procesamientos duplicados
@@ -1203,49 +1215,23 @@ io.on('connection', (socket) => {
         timestamp: Date.now()
       };
 
-      const connectedPlayers = getConnectedPlayers(gameState);
       const validatedCount = Object.keys(gameState.votingValidations).length;
-      const totalPlayers = gameState.players.length; // CORREGIDO: Usar jugadores originales, no conectados
+      const totalPlayers = gameState.players.length;
 
-      logEvent({ socket, event: 'validateVoting', roomId, message: `${playerName} validó su votación (${validatedCount}/${totalPlayers} jugadores originales)` });
+      logEvent({ socket, event: 'validateVoting', roomId, message: `${playerName} validó su votación (${validatedCount}/${totalPlayers} jugadores).` });
 
-      // Notificar a todos del progreso con información correcta
+      // Notificar a todos del progreso
       io.to(roomId).emit('votingProgress', {
         playersReady: validatedCount,
-        totalPlayers: gameState.players.length,
+        totalPlayers: totalPlayers,
         pendingPlayers: gameState.players.filter(p => !gameState.votingValidations[p.name]).map(p => p.name)
       });
-
-      // DEBUG: Verificar estado de la fase antes de procesar
-      console.log(`🔍 [DEBUG] Estado actual de la sala ${roomId}:`);
-      console.log(`   - Fase actual: ${gameState.roundPhase}`);
-      console.log(`   - Jugadores originales: ${gameState.players.map(p => p.name).join(', ')}`);
-      console.log(`   - Validaciones actuales: ${Object.keys(gameState.votingValidations).join(', ')}`);
-      console.log(`   - Validados: ${validatedCount}/${gameState.players.length}`);
       
-      // CRÍTICO: Solo procesar si estamos en fase de votación
-      if (gameState.roundPhase !== 'voting') {
-        console.log(`❌ [ERROR] Intento de validación fuera de fase de votación. Fase actual: ${gameState.roundPhase}`);
-        // Si ya está en results, no es error - simplemente ignorar
-        if (gameState.roundPhase === 'results') {
-          console.log(`ℹ️ [INFO] Validación ignorada - ya en fase de resultados`);
-          return;
-        }
-        return socket.emit('votingError', { message: 'La votación ya ha terminado.' });
-      }
-      
-      // CORREGIDO: Solo completar votación cuando TODOS los jugadores originales hayan validado
-      const allOriginalPlayersValidated = gameState.players.every(p => {
-        const hasValidated = gameState.votingValidations[p.name];
-        console.log(`   - ${p.name}: ${hasValidated ? 'VALIDADO' : 'PENDIENTE'}`);
-        return hasValidated;
-      });
+      // Comprobar si todos los jugadores originales han validado
+      const allOriginalPlayersValidated = gameState.players.every(p => gameState.votingValidations[p.name]);
 
-      console.log(`🔍 [DEBUG] ¿Todos validaron? ${allOriginalPlayersValidated}`);
-
-      // Solo avanzar si TODOS los jugadores originales han validado
-      if (gameState.players.length > 0 && allOriginalPlayersValidated) {
-        console.log(`✅ [SERVER] Todos los ${gameState.players.length} jugadores han validado. Completando votación.`);
+      if (totalPlayers > 0 && allOriginalPlayersValidated) {
+        logEvent({ roomId, event: 'validateVoting', message: `Todos los ${totalPlayers} jugadores han validado. Completando votación.` });
         
         // Notificar estado de procesamiento antes de completar
         io.to(roomId).emit('votingProcessing', {
@@ -1253,27 +1239,21 @@ io.on('connection', (socket) => {
           allPlayersReady: true
         });
         
-        logEvent({ roomId, event: 'validateVoting', message: `Todos los ${gameState.players.length} jugadores han validado. Completando votación.` });
-        
-        // Pequeño delay para mostrar el mensaje de procesamiento
+        // Pequeño delay para que los jugadores vean el mensaje de "Procesando"
         setTimeout(() => {
           completeVoting(roomId);
-        }, 1000);
+        }, 1500);
       } else {
-        console.log(`⏳ [SERVER] Esperando más validaciones. ${validatedCount}/${gameState.players.length} completadas.`);
         // Notificar estado de espera a los jugadores que ya validaron
-        const waitingPlayers = gameState.players.filter(p => gameState.votingValidations[p.name]);
-        waitingPlayers.forEach(player => {
-          const playerSocket = [...io.sockets.sockets.values()].find(s => s.playerName === player.name);
-          if (playerSocket) {
-            playerSocket.emit('votingWaiting', {
+        const waitingPlayer = gameState.players.find(p => p.name === playerName);
+        if (waitingPlayer) {
+            socket.emit('votingWaiting', {
               message: 'Esperando a los demás jugadores...',
               playersReady: validatedCount,
-              totalPlayers: gameState.players.length,
+              totalPlayers: totalPlayers,
               pendingPlayers: gameState.players.filter(p => !gameState.votingValidations[p.name]).map(p => p.name)
             });
-          }
-        });
+        }
       }
       
     } catch (error) {
